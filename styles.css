@@ -602,3 +602,25 @@ body.theme-light {
 .mh-setting-area { flex-wrap: wrap; }
 .mh-setting-area .setting-item-control { width: 100%; }
 .mh-setting-area textarea { font-family: var(--font-monospace); font-size: 12px; }
+
+/* ═══ no scrolling: the page is scaled to fit by main.js (see fit()) ═══ */
+.mh-fit .mh-scroll { overflow-y: hidden; align-items: flex-start; }
+.mh-fit .mh-scroll.is-overflow { overflow-y: auto; }
+.mh-keep { text-transform: none; }
+
+/* the shell's output floats above the prompt instead of pushing the page taller,
+   so the page never re-scales while you type commands */
+.mh-sec-shell .mh-body { position: relative; }
+.mh-out {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  bottom: calc(100% + 8px);
+  z-index: 8;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--mh-rule);
+  border-radius: 8px;
+  background: var(--background-primary, #0f0f12);
+  box-shadow: 0 6px 24px var(--mz-shadow);
+}

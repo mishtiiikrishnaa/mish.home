@@ -1,0 +1,214 @@
+{
+  "v": 2,
+  "settings": {
+    "lowercaseUi": true,
+    "lowercaseText": true,
+    "username": "",
+    "font": "bundled",
+    "customFont": "",
+    "startup": "always",
+    "takeNewTabs": false,
+    "openIn": "tab",
+    "pinTab": false,
+    "hideHeader": true,
+    "tabTitle": "home",
+    "ribbon": true,
+    "focusShell": false,
+    "exclude": ".trash, templates",
+    "weekStart": "mon",
+    "palette": {
+      "preset": "theme",
+      "colours": [
+        "#ffa6c9",
+        "#ffd6a6",
+        "#fff1a8",
+        "#c9ffa6",
+        "#a6c9ff",
+        "#c9b0ff"
+      ]
+    },
+    "inkColour": "",
+    "pills": {
+      "user": true,
+      "path": true,
+      "git": true,
+      "time": true
+    },
+    "pillShape": "arrow",
+    "pathLabel": "",
+    "clock": {
+      "hour12": false,
+      "seconds": false
+    },
+    "showCommands": true,
+    "sections": [
+      {
+        "id": "banner",
+        "on": true,
+        "wide": true
+      },
+      {
+        "id": "greeting",
+        "on": true,
+        "wide": false
+      },
+      {
+        "id": "shortcuts",
+        "on": true,
+        "wide": false
+      },
+      {
+        "id": "fetch",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "recent",
+        "on": true,
+        "wide": false
+      },
+      {
+        "id": "pinned",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "tasks",
+        "on": true,
+        "wide": false
+      },
+      {
+        "id": "streak",
+        "on": true,
+        "wide": true
+      },
+      {
+        "id": "quote",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "shell",
+        "on": true,
+        "wide": true
+      }
+    ],
+    "banner": {
+      "source": "vault",
+      "custom": "",
+      "style": "blocks",
+      "letters": "lower",
+      "size": 7,
+      "gradient": "rainbow",
+      "align": "left"
+    },
+    "greeting": {
+      "template": "{greeting}, {name}.",
+      "showDate": true,
+      "dateFormat": "dddd · D MMMM YYYY",
+      "progress": {
+        "day": false,
+        "week": false,
+        "month": false,
+        "year": true
+      },
+      "barWidth": 24,
+      "barHeight": 9
+    },
+    "shortcuts": {
+      "items": "new note | file-explorer:new-file\ngo to file | switcher:open\ndaily note | mish-home:daily-note\nsearch | global-search:open\ngraph view | graph:open\ncommand palette | command-palette:open",
+      "layout": "list",
+      "colour": "plain",
+      "hotkeys": true,
+      "hideMissing": true
+    },
+    "fetch": {
+      "fields": {
+        "user": true,
+        "os": true,
+        "app": false,
+        "vault": true,
+        "notes": true,
+        "links": true,
+        "tags": false,
+        "folders": true,
+        "files": true,
+        "size": true,
+        "theme": false,
+        "plugins": false,
+        "uptime": true
+      },
+      "colourBar": true
+    },
+    "recent": {
+      "mode": "opened",
+      "count": 8,
+      "types": "notes",
+      "extensions": "hide",
+      "nameColour": "rainbow",
+      "age": true,
+      "folder": false,
+      "tree": true
+    },
+    "pinned": {
+      "paths": "",
+      "bookmarks": true,
+      "extensions": "hide",
+      "nameColour": "rainbow",
+      "tree": true
+    },
+    "tasks": {
+      "count": 6,
+      "scan": 40,
+      "complete": true,
+      "showNote": true
+    },
+    "streak": {
+      "metric": "edits",
+      "weeks": 0,
+      "colour": "green",
+      "shape": "square",
+      "cell": 11,
+      "gap": 3,
+      "dayLabels": true,
+      "monthLabels": true,
+      "summary": true
+    },
+    "quote": {
+      "lines": "make it work, then make it pretty.\nread the error message. the whole thing.\none note at a time.\nfuture you is reading this. be kind to them.\nit compiles. ship it. then test it.\ncommit early. commit often. commit something.\nthe best note is the one you actually wrote.",
+      "mode": "daily"
+    },
+    "shell": {
+      "outputLines": 8,
+      "placeholder": "type a command · help"
+    },
+    "daily": {
+      "folder": "",
+      "format": ""
+    },
+    "layout": {
+      "frame": "one",
+      "columns": 2,
+      "width": 860,
+      "gap": 16,
+      "inner": 16,
+      "fit": "shrink",
+      "minScale": 55
+    },
+    "card": {
+      "hAlign": "centre",
+      "vAlign": "centre",
+      "ring": "rainbow",
+      "ringWidth": 1,
+      "angle": 135,
+      "radius": 12,
+      "pad": 16,
+      "textSize": 100
+    }
+  },
+  "opened": [
+    "file:/Users/mishti/Documents/testing/test.md"
+  ],
+  "activity": {},
+  "history": []
+}

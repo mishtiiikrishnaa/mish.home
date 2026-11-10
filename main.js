@@ -142,9 +142,9 @@ class UiSetting extends Setting {
    in the two-column layout. */
 const SECTION_META = {
   banner:    { label: 'banner',    wide: true,  on: true,  desc: 'big block letters: the vault name, your name or any text.' },
-  greeting:  { label: 'greeting',  wide: true,  on: true,  desc: 'a hello, the date, and little progress bars for the day, week, month and year.' },
+  greeting:  { label: 'greeting',  wide: false, on: true,  desc: 'a hello, the date, and little progress bars for the day, week, month and year.' },
   shortcuts: { label: 'shortcuts', wide: false, on: true,  desc: 'commands you can click, with their hotkeys: new note, go to file, anything in the command palette.' },
-  fetch:     { label: 'fastfetch', wide: false, on: true,  desc: 'vault stats in the fastfetch style.' },
+  fetch:     { label: 'fastfetch', wide: false, on: false, desc: 'vault stats in the fastfetch style. off by default, since the mish.fastfetch sidebar already shows them.' },
   recent:    { label: 'recent',    wide: false, on: true,  desc: 'the notes you opened or edited last, as an eza-style tree.' },
   pinned:    { label: 'pinned',    wide: false, on: false, desc: 'notes you pin by name, plus your bookmarks.' },
   tasks:     { label: 'todo',      wide: false, on: true,  desc: 'open checkboxes from across the vault. click a box to tick it.' },
@@ -221,7 +221,7 @@ const DEFAULT_SETTINGS = {
 
   sections: SECTION_IDS.map((id) => ({ id, on: SECTION_META[id].on, wide: SECTION_META[id].wide })),
 
-  banner: { source: 'vault', custom: '', style: 'blocks', size: 7, gradient: 'rainbow', align: 'left' },
+  banner: { source: 'vault', custom: '', style: 'blocks', letters: 'lower', size: 7, gradient: 'rainbow', align: 'left' },
 
   greeting: {
     template: '{greeting}, {name}.',
@@ -232,7 +232,7 @@ const DEFAULT_SETTINGS = {
     barHeight: 9,
   },
 
-  shortcuts: { items: DEFAULT_SHORTCUTS, layout: 'list', colour: 'plain', hotkeys: true },
+  shortcuts: { items: DEFAULT_SHORTCUTS, layout: 'list', colour: 'plain', hotkeys: true, hideMissing: true },
 
   fetch: {
     fields: { user: true, os: true, app: false, vault: true, notes: true, links: true, tags: false, folders: true, files: true, size: true, theme: false, plugins: false, uptime: true },
@@ -254,7 +254,7 @@ const DEFAULT_SETTINGS = {
   daily: { folder: '', format: '' },    /* empty = whatever the core daily notes plugin says, else the vault root and YYYY-MM-DD */
 
   /* the card */
-  layout: { frame: 'one', columns: 2, width: 860, gap: 16, inner: 16 },   /* frame: one | each | none */
+  layout: { frame: 'one', columns: 2, width: 860, gap: 16, inner: 16, fit: 'shrink', minScale: 55 },   /* frame: one | each | none. fit: shrink | scroll */
   card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 12, pad: 16, textSize: 100 },
 };
 
@@ -291,6 +291,7 @@ const sanitise = (cfg) => {
   b.style = oneOf(b.style, ['blocks', 'text'], 'blocks');
   b.gradient = oneOf(b.gradient, ['rainbow', 'accent', 'pink', 'plain'], 'rainbow');
   b.align = oneOf(b.align, ['left', 'centre'], 'left');
+  b.letters = oneOf(b.letters, ['lower', 'caps'], 'lower');
   b.size = num(b.size, 3, 14, 7);
 
   const g = cfg.greeting;
@@ -299,6 +300,7 @@ const sanitise = (cfg) => {
 
   cfg.shortcuts.layout = oneOf(cfg.shortcuts.layout, ['list', 'row'], 'list');
   cfg.shortcuts.colour = oneOf(cfg.shortcuts.colour, ['plain', 'rainbow'], 'plain');
+  cfg.shortcuts.hideMissing = cfg.shortcuts.hideMissing !== false;
 
   const r = cfg.recent;
   r.mode = oneOf(r.mode, ['opened', 'edited', 'created'], 'opened');
@@ -331,6 +333,8 @@ const sanitise = (cfg) => {
   l.width = num(l.width, 420, 1400, 860);
   l.gap = num(l.gap, 0, 40, 16);
   l.inner = num(l.inner, 0, 40, 16);
+  l.fit = oneOf(l.fit, ['shrink', 'scroll'], 'shrink');
+  l.minScale = num(l.minScale, 30, 100, 55);
 
   const c = cfg.card;
   c.ring = oneOf(c.ring, RINGS, 'rainbow');
@@ -597,35 +601,81 @@ const BANNER_FONT = {
   '/': '....#|...#.|..#..|.#...|#....', ' ': '...|...|...|...|...',
 };
 
-const bannerBitmap = (text) => {
-  const rows = ['', '', '', '', ''];
+/* the lowercase face: 9 rows. rows 0-1 are where ascenders (b d f h k l t) and the dot of an i / j
+   live, rows 2-6 are the x-height, rows 7-8 are where descenders (g j p q y) hang. empty rows at
+   the top and bottom are trimmed away, so "mish.shell" is only 7 rows tall. */
+const BANNER_LOWER = {
+  a: '.....|.....|.###.|....#|.####|#...#|.####|.....|.....',
+  b: '#....|#....|####.|#...#|#...#|#...#|####.|.....|.....',
+  c: '.....|.....|.####|#....|#....|#....|.####|.....|.....',
+  d: '....#|....#|.####|#...#|#...#|#...#|.####|.....|.....',
+  e: '.....|.....|.###.|#...#|#####|#....|.####|.....|.....',
+  f: '..##.|.#...|####.|.#...|.#...|.#...|.#...|.....|.....',
+  g: '.....|.....|.####|#...#|#...#|#...#|.####|....#|.###.',
+  h: '#....|#....|#.##.|##..#|#...#|#...#|#...#|.....|.....',
+  i: '..#..|.....|.##..|..#..|..#..|..#..|.###.|.....|.....',
+  j: '...#.|.....|..##.|...#.|...#.|...#.|...#.|#..#.|.##..',
+  k: '#....|#....|#..#.|#.#..|##...|#.#..|#..#.|.....|.....',
+  l: '.##..|..#..|..#..|..#..|..#..|..#..|.###.|.....|.....',
+  m: '.....|.....|##.#.|#.#.#|#.#.#|#.#.#|#.#.#|.....|.....',
+  n: '.....|.....|#.##.|##..#|#...#|#...#|#...#|.....|.....',
+  o: '.....|.....|.###.|#...#|#...#|#...#|.###.|.....|.....',
+  p: '.....|.....|####.|#...#|#...#|#...#|####.|#....|#....',
+  q: '.....|.....|.####|#...#|#...#|#...#|.####|....#|....#',
+  r: '.....|.....|#.##.|##..#|#....|#....|#....|.....|.....',
+  s: '.....|.....|.####|#....|.###.|....#|####.|.....|.....',
+  t: '.....|.#...|####.|.#...|.#...|.#...|..##.|.....|.....',
+  u: '.....|.....|#...#|#...#|#...#|#..##|.##.#|.....|.....',
+  v: '.....|.....|#...#|#...#|#...#|.#.#.|..#..|.....|.....',
+  w: '.....|.....|#...#|#...#|#.#.#|#.#.#|.#.#.|.....|.....',
+  x: '.....|.....|#...#|.#.#.|..#..|.#.#.|#...#|.....|.....',
+  y: '.....|.....|#...#|#...#|#...#|.####|....#|....#|.###.',
+  z: '.....|.....|#####|...#.|..#..|.#...|#####|.....|.....',
+  '.': '.|.|.|.|.|.|#|.|.',
+  '-': '...|...|...|...|###|...|...|...|...',
+  _: '.....|.....|.....|.....|.....|.....|.....|#####|.....',
+  '/': '....#|....#|...#.|..#..|..#..|.#...|#....|#....|.....',
+  ' ': '...|...|...|...|...|...|...|...|...',
+};
+/* digits sit at x-height, so they reuse the five-row capital digits */
+for (const d of '0123456789') BANNER_LOWER[d] = ['.....', '.....', BANNER_FONT[d], '.....', '.....'].join('|');
+
+/* letters: 'lower' = the lowercase face, 'caps' = the five-row capitals */
+const bannerBitmap = (text, letters) => {
+  const font = letters === 'caps' ? BANNER_FONT : BANNER_LOWER;
+  const height = letters === 'caps' ? 5 : 9;
+  let rows = new Array(height).fill('');
   let first = true;
   for (const ch of String(text).toLowerCase()) {
-    const g = BANNER_FONT[ch];
+    const g = font[ch];
     if (!g) continue;
     const parts = g.split('|');
-    if (!first) for (let r = 0; r < 5; r++) rows[r] += '.';      /* one blank column between letters */
+    if (!first) for (let r = 0; r < height; r++) rows[r] += '.';      /* one blank column between letters */
     first = false;
-    for (let r = 0; r < 5; r++) rows[r] += parts[r];
+    for (let r = 0; r < height; r++) rows[r] += parts[r];
   }
+  /* empty rows at the top and bottom would only waste space */
+  while (rows.length && !rows[0].includes('#')) rows.shift();
+  while (rows.length && !rows[rows.length - 1].includes('#')) rows.pop();
   return rows;
 };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-const bannerSvg = (text, uid, gradient) => {
-  const rows = bannerBitmap(text);
+const bannerSvg = (text, uid, gradient, letters) => {
+  const rows = bannerBitmap(text, letters);
+  if (!rows.length) return null;
   const W = rows[0].length;
-  if (!W) return null;
+  const H = rows.length;
 
   const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 ' + W + ' 5');
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
   svg.setAttribute('class', 'mh-banner');
   svg.setAttribute('shape-rendering', 'crispEdges');
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', text);
   svg.style.setProperty('--mh-bw', String(W));
-  svg.style.aspectRatio = W + ' / 5';
+  svg.style.aspectRatio = W + ' / ' + H;
 
   const id = 'mh-grad-' + uid;
   const defs = document.createElementNS(SVG_NS, 'defs');
@@ -699,6 +749,8 @@ class MishHome extends Plugin {
     const saved = (await this.loadData()) || {};
     this.settings = sanitise(deepMerge(clone(DEFAULT_SETTINGS), saved.settings || {}));
     uiCase.lower = this.settings.lowercaseUi;
+    /* 1.0.0 saved the old section layout; the new default (no fastfetch, greeting beside shortcuts) applies once */
+    if ((saved.v || 0) < 2) this.settings.sections = clone(DEFAULT_SETTINGS.sections);
     this.opened = Array.isArray(saved.opened) ? saved.opened.filter((p) => typeof p === 'string').slice(0, 60) : [];
     this.history = Array.isArray(saved.history) ? saved.history.filter((p) => typeof p === 'string').slice(-60) : [];
     this.activity = {};
@@ -1145,7 +1197,7 @@ class MishHome extends Plugin {
 
   async saveAll() {
     await this.saveData({
-      v: 1,
+      v: 2,
       settings: this.settings,
       opened: this.opened,
       activity: this.activity,
@@ -1225,6 +1277,63 @@ class HomeView extends ItemView {
 
   stop() {
     if (this.streakRO) { this.streakRO.disconnect(); this.streakRO = null; }
+    if (this.fitRO) { this.fitRO.disconnect(); this.fitRO = null; }
+    if (this.fitRaf) { cancelAnimationFrame(this.fitRaf); this.fitRaf = 0; }
+  }
+
+  /* ── fitting the page to the tab ───────────────────────────────────────────
+     the home page should never need scrolling. the card is laid out at the width it will end up
+     with, measured, and when it is too tall it is scaled down (and laid out wider by the same
+     factor, so it still fills the same width and needs fewer lines). if even the smallest allowed
+     scale is not enough, scrolling comes back, because unreachable content is worse. */
+  scheduleFit() {
+    if (this.fitRaf) return;
+    this.fitRaf = requestAnimationFrame(() => {
+      this.fitRaf = 0;
+      if (this.contentEl.isShown()) this.fit();
+    });
+  }
+
+  fit() {
+    const scroll = this.scrollEl;
+    const card = this.cardEl;
+    if (!scroll || !card) return;
+    const L = this.s.layout;
+    card.style.width = '';
+    card.style.margin = '';
+    card.style.transform = '';
+    card.style.transformOrigin = '';
+    scroll.classList.remove('is-overflow');
+    this.contentEl.classList.toggle('mh-fit', L.fit === 'shrink');
+    if (L.fit !== 'shrink') return;
+
+    const cs = (scroll.ownerDocument.defaultView || window).getComputedStyle(scroll);
+    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const availW = scroll.clientWidth - padX;
+    const availH = scroll.clientHeight - padY;
+    if (!(availW > 80 && availH > 80)) return;       /* not laid out yet */
+
+    const baseW = Math.min(availW, L.width);
+    const floor = L.minScale / 100;
+    let k = 1;
+    let h = 0;
+    for (let i = 0; i < 5; i++) {
+      card.style.width = (baseW / k) + 'px';
+      h = card.offsetHeight;
+      const next = Math.min(1, Math.max(floor, availH / h));
+      if (Math.abs(next - k) < 0.005) break;
+      k = next;
+    }
+
+    const c = this.s.card;
+    const offX = c.hAlign === 'left' ? 0 : Math.max(0, (availW - baseW) / 2);
+    const offY = c.vAlign === 'top' ? 0 : Math.max(0, (availH - h * k) / 2);
+    card.style.transformOrigin = '0 0';
+    card.style.transform = k < 1 ? 'scale(' + k + ')' : '';
+    /* the negative bottom margin cancels the room the unscaled box would take */
+    card.style.margin = offY + 'px 0 ' + (h * k - h) + 'px ' + offX + 'px';
+    if (h * k > availH + 1) scroll.classList.add('is-overflow');
   }
 
   focusShell() {
@@ -1259,6 +1368,13 @@ class HomeView extends ItemView {
     card.appendChild(grid);
     scroll.appendChild(card);
     host.appendChild(scroll);
+    this.scrollEl = scroll;
+    this.cardEl = card;
+    if (typeof ResizeObserver === 'function') {
+      this.fitRO = new ResizeObserver(() => this.scheduleFit());
+      this.fitRO.observe(scroll);
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.scheduleFit());
 
     this.restyle();
     this.drawBar();
@@ -1278,6 +1394,7 @@ class HomeView extends ItemView {
     host.classList.toggle('mh-lower', s.lowercaseText);
     host.classList.toggle('mh-nocmd', !s.showCommands);
     if (this.leaf && this.leaf.updateHeader) this.leaf.updateHeader();     /* picks up a new tab title */
+    this.scheduleFit();
   }
 
   makeSection(it) {
@@ -1324,7 +1441,8 @@ class HomeView extends ItemView {
     if (!r || !fn) return;
     try {
       const out = fn.call(this, r.body);
-      if (out && out.catch) out.catch((e) => this.broke(id, e));
+      if (out && out.then) out.then(() => this.scheduleFit(), (e) => this.broke(id, e));
+      else this.scheduleFit();
     } catch (e) {
       this.broke(id, e);
     }
@@ -1406,7 +1524,7 @@ class HomeView extends ItemView {
       body.appendChild(el('div', 'mh-btext mh-grad-' + b.gradient, text));
       return;
     }
-    const svg = bannerSvg(text, this.uid, b.gradient);
+    const svg = bannerSvg(text, this.uid, b.gradient, b.letters);
     if (svg) body.appendChild(svg);
   }
 
@@ -1469,7 +1587,8 @@ class HomeView extends ItemView {
   fill_shortcuts(body) {
     const sc = this.s.shortcuts;
     body.replaceChildren();
-    const items = parseShortcuts(sc.items);
+    let items = parseShortcuts(sc.items);
+    if (sc.hideMissing) items = items.filter((it) => this.app.commands.commands[it.id]);
     if (!items.length) { body.appendChild(this.hint('no shortcuts. add some in settings.')); return; }
     body.classList.toggle('is-row', sc.layout === 'row');
     items.forEach((it, i) => {
@@ -1502,7 +1621,7 @@ class HomeView extends ItemView {
     if (on.vault) {
       let path = this.app.vault.getName();
       try { path = this.app.vault.adapter.getBasePath() || path; } catch (e) { /* not a desktop adapter */ }
-      rows.push(['vault', path]);
+      rows.push(['vault', path, false, false, true]);
     }
     if (on.notes) rows.push(['notes', String(st.notes)]);
     if (on.links) rows.push(['links', String(st.links)]);
@@ -1515,9 +1634,9 @@ class HomeView extends ItemView {
     if (on.uptime) rows.push(['uptime', fmtUp(performance.now()), false, true]);
 
     const kv = el('div', 'mh-kv');
-    for (const [k, v, dim, live] of rows) {
+    for (const [k, v, dim, live, keep] of rows) {
       kv.appendChild(el('span', 'mh-k', k));
-      const val = el('span', 'mh-v' + (dim ? ' is-dim' : ''), v);
+      const val = el('span', 'mh-v' + (dim ? ' is-dim' : '') + (keep ? ' mh-keep' : ''), v);
       if (live) this.upEl = val;
       kv.appendChild(val);
     }
@@ -2319,6 +2438,7 @@ class HomeSettingTab extends PluginSettingTab {
     head('banner');
     drop('banner.source', 'text', 'what the big letters say.', { vault: 'the vault name', name: 'your name', custom: 'custom text' }, 'data');
     text('banner.custom', 'custom text', 'used when text is set to custom. letters, numbers, spaces and . - _ / are drawn; anything else is skipped.', 'welcome home', 'data');
+    drop('banner.letters', 'letters', 'lowercase is a full lowercase block face with ascenders and descenders (mish.shell). capitals are the chunkier five-row letters.', { lower: 'lowercase', caps: 'capitals' }, 'data');
     drop('banner.style', 'style', 'blocks are pixel letters drawn by the plugin. text is a big line in your font.', { blocks: 'blocks', text: 'big text' }, 'data');
     slide('banner.size', 'block size', 'how big one pixel of a letter is. a ten-letter name is about 60 pixels wide.', 3, 14, 1, 'look', ' px');
     drop('banner.gradient', 'colour', 'rainbow runs across the six palette colours.',
@@ -2353,10 +2473,12 @@ class HomeSettingTab extends PluginSettingTab {
       }));
     drop('shortcuts.layout', 'layout', 'list is one per line, like the new-tab screen. row puts them side by side.', { list: 'list', row: 'row' }, 'data');
     drop('shortcuts.colour', 'label colour', '', { plain: 'plain', rainbow: 'rainbow' }, 'data');
+    tog('shortcuts.hideMissing', 'hide unavailable', 'leaves out shortcuts whose command does not exist (for example, a core plugin you have switched off), instead of showing them dimmed.', 'data');
     tog('shortcuts.hotkeys', 'show hotkeys', 'the little ⌘ n badge, when the command has a hotkey.', 'data');
 
     /* ── fastfetch ── */
     head('fastfetch');
+    new UiSetting(containerEl).setDesc('this section is off by default. your sidebar already has mish.fastfetch. switch it on under sections.');
     for (const key of Object.keys(FETCH_FIELDS)) tog('fetch.fields.' + key, FETCH_FIELDS[key], '', 'data');
     tog('fetch.colourBar', 'colour bar', 'the row of colour blocks at the bottom.', 'data');
 
@@ -2503,6 +2625,9 @@ class HomeSettingTab extends PluginSettingTab {
     drop('layout.frame', 'frame', 'one card puts everything in a single bordered box. each section gives every section its own box. none has no borders at all.',
       { one: 'one card', each: 'each section', none: 'none' }, 'look');
     drop('layout.columns', 'columns', 'two columns pair up the half-width sections. narrow tabs always fall back to one.', { 1: 'one', 2: 'two' }, 'look');
+    drop('layout.fit', 'when the page is taller than the tab', 'shrink scales the whole page down to fit, so it never scrolls. scroll leaves it full size and lets you scroll.',
+      { shrink: 'shrink to fit', scroll: 'scroll' }, 'look');
+    slide('layout.minScale', 'smallest size', 'shrinking stops here. if the page still does not fit, scrolling comes back so nothing is out of reach. turn a section off or lower the number of rows to get more room.', 30, 100, 5, 'look', '%');
     slide('layout.width', 'maximum width', 'how wide the page gets in a big tab.', 420, 1400, 20, 'look', ' px');
     slide('layout.gap', 'gap between sections', '', 0, 40, 1, 'look', ' px');
     slide('layout.inner', 'card padding', 'space between a border and what is inside it.', 0, 40, 1, 'look', ' px');
