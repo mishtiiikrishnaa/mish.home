@@ -58,11 +58,6 @@
         "wide": false
       },
       {
-        "id": "calendar",
-        "on": true,
-        "wide": false
-      },
-      {
         "id": "tasks",
         "on": true,
         "wide": false

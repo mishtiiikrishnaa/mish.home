@@ -144,7 +144,6 @@ const SECTION_META = {
   banner:    { label: 'banner',      wide: true,  on: true,  desc: 'big block letters: the vault name, your name, the time or any text.' },
   greeting:  { label: 'greeting',    wide: false, on: true,  desc: 'a hello, the date, a one-line summary and progress bars for the day, week, month and year.' },
   shortcuts: { label: 'shortcuts',   wide: false, on: true,  desc: 'commands you can click, with their hotkeys: new note, go to file, anything in the command palette.' },
-  calendar:  { label: 'calendar',    wide: false, on: true,  desc: 'this month, like the cal command. days you wrote on are marked. click a day to open its daily note.' },
   tasks:     { label: 'todo',        wide: false, on: true,  desc: 'open checkboxes from across the vault. click a box to tick it.' },
   recent:    { label: 'recent',      wide: false, on: true,  desc: 'the notes you opened or edited last, as an eza-style tree.' },
   system:    { label: 'system',      wide: false, on: true,  desc: 'cpu, memory, battery and uptime, btop-style. updates live.' },
