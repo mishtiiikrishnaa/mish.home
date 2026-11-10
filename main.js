@@ -267,7 +267,7 @@ const DEFAULT_SETTINGS = {
   daily: { folder: '', format: '' },    /* empty = whatever the core daily notes plugin says, else the vault root and YYYY-MM-DD */
 
   /* the card */
-  layout: { frame: 'one', columns: 3, width: 1100, gap: 14, inner: 14, fit: 'shrink', minScale: 55 },   /* frame: one | each | none. fit: shrink | scroll */
+  layout: { frame: 'one', columns: 3, width: 1100, gap: 14, inner: 14, fit: 'shrink', minScale: 55, split: 'right', sideWidth: 400 },   /* frame: one | each | none. fit: shrink | scroll */
   card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 12, pad: 16, textSize: 100 },
 };
 
@@ -373,6 +373,8 @@ const sanitise = (cfg) => {
   l.inner = num(l.inner, 0, 40, 14);
   l.fit = oneOf(l.fit, ['shrink', 'scroll'], 'shrink');
   l.minScale = num(l.minScale, 30, 100, 55);
+  l.split = oneOf(l.split, ['right', 'off'], 'right');      /* right = the terminal is a tall pane beside the sections */
+  l.sideWidth = num(l.sideWidth, 260, 640, 400);
 
   const c = cfg.card;
   c.ring = oneOf(c.ring, RINGS, 'rainbow');
@@ -411,11 +413,17 @@ const paletteVars = (cfg) => {
 
 /* css variables for sizes, the border and the layout. every one has the default as its
    fallback in styles.css. */
+/* the terminal sits in its own tall pane when that is switched on and the terminal section is too */
+const splitActive = (cfg) => cfg.layout.split === 'right' && cfg.sections.some((it) => it.id === 'shell' && it.on);
+/* the pane is added on top of the width you set, so the sections keep the room they always had */
+const cardWidth = (cfg) => cfg.layout.width + (splitActive(cfg) ? cfg.layout.sideWidth : 0);
+
 const layoutVars = (cfg) => {
   const c = cfg.card;
   const l = cfg.layout;
   const v = {
-    '--mh-w': l.width + 'px',
+    '--mh-w': cardWidth(cfg) + 'px',
+    '--mh-side': l.sideWidth + 'px',
     '--mh-cols': String(l.columns),
     '--mh-gap': l.gap + 'px',
     '--mh-inner': l.inner + 'px',
@@ -1628,7 +1636,7 @@ class HomeView extends ItemView {
     const availH = scroll.clientHeight - padY;
     if (!(availW > 80 && availH > 80)) return;       /* not laid out yet */
 
-    const baseW = Math.min(availW, L.width);
+    const baseW = Math.min(availW, cardWidth(this.s));
     const floor = L.minScale / 100;
     /* the card is laid out at baseW / k and then scaled by k, so it always ends up baseW wide.
        a smaller k means a wider layout, which means fewer wrapped lines and maybe more columns,
@@ -1692,9 +1700,26 @@ class HomeView extends ItemView {
 
     const grid = el('div', 'mh-grid');
     const active = s.sections.filter((it) => it.on);
-    for (const it of active) grid.appendChild(this.makeSection(it));
+    const split = splitActive(s);
+    let sideSec = null;
+    for (const it of active) {
+      const sec = this.makeSection(it);
+      if (split && it.id === 'shell') sideSec = sec; else grid.appendChild(sec);
+    }
     if (!active.length) grid.appendChild(el('div', 'mh-hint is-wide', '# every section is switched off. open settings > mish.home.'));
-    card.appendChild(grid);
+    if (sideSec) {
+      /* sections on the left, the terminal as one tall pane on the right, like a tmux split */
+      const wrap = el('div', 'mh-split');
+      const main = el('div', 'mh-main');
+      const pane = el('div', 'mh-side');
+      main.appendChild(grid);
+      pane.appendChild(sideSec);
+      wrap.appendChild(main);
+      wrap.appendChild(pane);
+      card.appendChild(wrap);
+    } else {
+      card.appendChild(grid);
+    }
     scroll.appendChild(card);
     host.appendChild(scroll);
     this.scrollEl = scroll;
@@ -1721,6 +1746,7 @@ class HomeView extends ItemView {
     setClassGroup(host, 'mh-shape-', s.pillShape);
     setClassGroup(host, 'mh-frame-', s.layout.frame);
     setClassGroup(host, 'mh-cols-', String(s.layout.columns));
+    host.classList.toggle('mh-split-on', splitActive(s));
     host.classList.toggle('mh-lower', s.lowercaseText);
     host.classList.toggle('mh-nocmd', !s.showCommands);
     if (this.leaf && this.leaf.updateHeader) this.leaf.updateHeader();     /* picks up a new tab title */
@@ -3859,6 +3885,9 @@ class HomeSettingTab extends PluginSettingTab {
     drop('layout.frame', 'frame', 'one card puts everything in a single bordered box. each section gives every section its own box. none has no borders at all.',
       { one: 'one card', each: 'each section', none: 'none' }, 'look');
     drop('layout.columns', 'columns', 'sections flow down each column, balanced, so there are no gaps. full-width sections span them all. narrow tabs use fewer columns.', { 1: 'one', 2: 'two', 3: 'three' }, 'look');
+    drop('layout.split', 'terminal', 'right puts the terminal in a tall pane beside the sections, like a tmux split. off keeps it as a short row under them.',
+      { right: 'tall pane on the right', off: 'row at the bottom' }, 'build');
+    slide('layout.sideWidth', 'terminal pane width', 'only used when the terminal is a pane. the pane is added to the maximum width below, so the sections keep their room.', 260, 640, 10, 'look', ' px');
     drop('layout.fit', 'when the page is taller than the tab', 'shrink scales the whole page down to fit, so it never scrolls. scroll leaves it full size and lets you scroll.',
       { shrink: 'shrink to fit', scroll: 'scroll' }, 'look');
     slide('layout.minScale', 'smallest size', 'shrinking stops here. if the page still does not fit, scrolling comes back so nothing is out of reach. turn a section off or lower the number of rows to get more room.', 30, 100, 5, 'look', '%');

@@ -733,3 +733,82 @@ body.theme-light {
 .mh-sec.is-wide { margin-top: var(--mh-gap, 16px); }
 .mh-grid > .mh-sec:first-child { margin-top: 0; }
 .mh-day { line-height: 1.55; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   1.2 · the terminal as a tall pane, and a plain caret
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* — the caret: no pink block. the input's own thin caret, in the text colour — */
+.mh .mh-input {
+  caret-color: var(--mh-fg);
+  caret-shape: bar;
+}
+.mh .mh-caret,
+.mh-inwrap:not(.is-focus) .mh-caret { display: none !important; }
+.mh-inwrap.is-empty .mh-input { text-indent: 0; }
+
+/* — sections on the left, the terminal on the right, like a tmux split — */
+.mh-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, min(var(--mh-side, 400px), 44%));
+  column-gap: calc(var(--mh-gap, 16px) * 1.5);
+  align-items: stretch;
+}
+.mh-main {
+  min-width: 0;
+  container-type: inline-size;
+  container-name: mhm;
+}
+/* the pane is laid over the grid cell, so its own height never decides how tall the page is:
+   the sections do, and the terminal simply fills it */
+.mh-side {
+  position: relative;
+  min-width: 0;
+  min-height: 340px;
+}
+.mh-side > .mh-sec {
+  position: absolute;
+  inset: 0;
+  margin: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+.mh-side .mh-cmd { flex: 0 0 auto; }
+.mh-side .mh-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mh-side .mh-term {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mh-side .mh-tbar,
+.mh-side .mh-menu,
+.mh-side .mh-tprompt { flex: 0 0 auto; }
+.mh-side .mh-tout {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+/* output stacks up from the prompt, so the welcome line sits right above where you type */
+.mh-side .mh-tout > :first-child { margin-top: auto; }
+
+/* the sections get their own column count, from the room the left side actually has */
+.mh-split .mh-main .mh-grid { column-count: var(--mh-cols, 2); }
+@container mhm (max-width: 840px) { .mh-split .mh-main .mh-grid { column-count: 2; } }
+@container mhm (max-width: 440px) { .mh-split .mh-main .mh-grid { column-count: 1; } }
+
+/* a narrow tab: the terminal drops back under the sections as a short window */
+@container mhc (max-width: 760px) {
+  .mh-split { grid-template-columns: minmax(0, 1fr); row-gap: var(--mh-gap, 16px); }
+  .mh-side { min-height: 0; }
+  .mh-side > .mh-sec { position: static; display: block; }
+  .mh-side .mh-body,
+  .mh-side .mh-term { display: block; }
+  .mh-side .mh-tout { height: calc(var(--mh-termlines, 5) * 1.5em + 10px); }
+  .mh-side .mh-tout > :first-child { margin-top: 0; }
+}
