@@ -1,5 +1,5 @@
 {
-  "v": 2,
+  "v": 3,
   "settings": {
     "lowercaseUi": true,
     "lowercaseText": true,
@@ -58,12 +58,22 @@
         "wide": false
       },
       {
-        "id": "fetch",
-        "on": false,
+        "id": "calendar",
+        "on": true,
+        "wide": false
+      },
+      {
+        "id": "tasks",
+        "on": true,
         "wide": false
       },
       {
         "id": "recent",
+        "on": true,
+        "wide": false
+      },
+      {
+        "id": "system",
         "on": true,
         "wide": false
       },
@@ -73,8 +83,33 @@
         "wide": false
       },
       {
-        "id": "tasks",
-        "on": true,
+        "id": "focus",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "links",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "tags",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "folders",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "random",
+        "on": false,
+        "wide": false
+      },
+      {
+        "id": "git",
+        "on": false,
         "wide": false
       },
       {
@@ -98,11 +133,12 @@
       "custom": "",
       "style": "blocks",
       "letters": "lower",
-      "size": 7,
+      "size": 6,
       "gradient": "rainbow",
       "align": "left"
     },
     "greeting": {
+      "summary": true,
       "template": "{greeting}, {name}.",
       "showDate": true,
       "dateFormat": "dddd · D MMMM YYYY",
@@ -121,24 +157,6 @@
       "colour": "plain",
       "hotkeys": true,
       "hideMissing": true
-    },
-    "fetch": {
-      "fields": {
-        "user": true,
-        "os": true,
-        "app": false,
-        "vault": true,
-        "notes": true,
-        "links": true,
-        "tags": false,
-        "folders": true,
-        "files": true,
-        "size": true,
-        "theme": false,
-        "plugins": false,
-        "uptime": true
-      },
-      "colourBar": true
     },
     "recent": {
       "mode": "opened",
@@ -168,8 +186,8 @@
       "weeks": 0,
       "colour": "green",
       "shape": "square",
-      "cell": 11,
-      "gap": 3,
+      "cell": 10,
+      "gap": 2,
       "dayLabels": true,
       "monthLabels": true,
       "summary": true
@@ -178,9 +196,59 @@
       "lines": "make it work, then make it pretty.\nread the error message. the whole thing.\none note at a time.\nfuture you is reading this. be kind to them.\nit compiles. ship it. then test it.\ncommit early. commit often. commit something.\nthe best note is the one you actually wrote.",
       "mode": "daily"
     },
-    "shell": {
-      "outputLines": 8,
-      "placeholder": "type a command · help"
+    "calendar": {
+      "mark": "activity",
+      "weekNumbers": false,
+      "arrows": true
+    },
+    "focus": {
+      "focusMin": 25,
+      "breakMin": 5,
+      "longBreakMin": 15,
+      "longEvery": 4,
+      "autoNext": false,
+      "notify": true
+    },
+    "links": {
+      "items": "github | https://github.com\nyoutube | https://youtube.com\nmail | https://mail.google.com",
+      "layout": "list",
+      "colour": "plain"
+    },
+    "tags": {
+      "count": 8
+    },
+    "folders": {
+      "count": 6,
+      "depth": 1
+    },
+    "random": {
+      "lines": 6,
+      "mode": "daily",
+      "minChars": 120
+    },
+    "system": {
+      "cpu": true,
+      "memory": true,
+      "battery": true,
+      "uptime": true,
+      "network": false,
+      "barWidth": 14
+    },
+    "git": {
+      "count": 5
+    },
+    "terminal": {
+      "style": "window",
+      "titleBar": true,
+      "title": "{user}@{host}: {path}",
+      "height": 4,
+      "prompt": "powerline",
+      "rprompt": true,
+      "suggest": true,
+      "welcome": true,
+      "placeholder": "type a command · help",
+      "capture": "daily",
+      "inbox": "inbox.md"
     },
     "daily": {
       "folder": "",
@@ -188,10 +256,10 @@
     },
     "layout": {
       "frame": "one",
-      "columns": 2,
-      "width": 860,
-      "gap": 16,
-      "inner": 16,
+      "columns": 3,
+      "width": 1100,
+      "gap": 14,
+      "inner": 14,
       "fit": "shrink",
       "minScale": 55
     },
@@ -206,9 +274,12 @@
       "textSize": 100
     }
   },
+  "focusLog": {},
   "opened": [
     "file:/Users/mishti/Documents/testing/test.md"
   ],
   "activity": {},
-  "history": []
+  "history": [
+    "help"
+  ]
 }

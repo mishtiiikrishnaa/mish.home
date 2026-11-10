@@ -141,16 +141,23 @@ class UiSetting extends Setting {
    order, on/off and full/half width of each one are settings. `wide` only matters
    in the two-column layout. */
 const SECTION_META = {
-  banner:    { label: 'banner',    wide: true,  on: true,  desc: 'big block letters: the vault name, your name or any text.' },
-  greeting:  { label: 'greeting',  wide: false, on: true,  desc: 'a hello, the date, and little progress bars for the day, week, month and year.' },
-  shortcuts: { label: 'shortcuts', wide: false, on: true,  desc: 'commands you can click, with their hotkeys: new note, go to file, anything in the command palette.' },
-  fetch:     { label: 'fastfetch', wide: false, on: false, desc: 'vault stats in the fastfetch style. off by default, since the mish.fastfetch sidebar already shows them.' },
-  recent:    { label: 'recent',    wide: false, on: true,  desc: 'the notes you opened or edited last, as an eza-style tree.' },
-  pinned:    { label: 'pinned',    wide: false, on: false, desc: 'notes you pin by name, plus your bookmarks.' },
-  tasks:     { label: 'todo',      wide: false, on: true,  desc: 'open checkboxes from across the vault. click a box to tick it.' },
-  streak:    { label: 'streak',    wide: true,  on: true,  desc: 'a contribution-style grid of the days you wrote, with your current streak.' },
-  quote:     { label: 'fortune',   wide: false, on: false, desc: 'one line from your own list, a new one each day.' },
-  shell:     { label: 'shell',     wide: true,  on: true,  desc: 'a prompt you can type into: open notes, make notes, search, run commands.' },
+  banner:    { label: 'banner',      wide: true,  on: true,  desc: 'big block letters: the vault name, your name, the time or any text.' },
+  greeting:  { label: 'greeting',    wide: false, on: true,  desc: 'a hello, the date, a one-line summary and progress bars for the day, week, month and year.' },
+  shortcuts: { label: 'shortcuts',   wide: false, on: true,  desc: 'commands you can click, with their hotkeys: new note, go to file, anything in the command palette.' },
+  calendar:  { label: 'calendar',    wide: false, on: true,  desc: 'this month, like the cal command. days you wrote on are marked. click a day to open its daily note.' },
+  tasks:     { label: 'todo',        wide: false, on: true,  desc: 'open checkboxes from across the vault. click a box to tick it.' },
+  recent:    { label: 'recent',      wide: false, on: true,  desc: 'the notes you opened or edited last, as an eza-style tree.' },
+  system:    { label: 'system',      wide: false, on: true,  desc: 'cpu, memory, battery and uptime, btop-style. updates live.' },
+  pinned:    { label: 'pinned',      wide: false, on: false, desc: 'notes you pin by name, plus your bookmarks.' },
+  focus:     { label: 'focus timer', wide: false, on: false, desc: 'a pomodoro timer: focus, break, repeat. it keeps running when you leave the tab.' },
+  links:     { label: 'links',       wide: false, on: false, desc: 'web links you open often. they open in your browser.' },
+  tags:      { label: 'tags',        wide: false, on: false, desc: 'your most used tags, with bars.' },
+  folders:   { label: 'folders',     wide: false, on: false, desc: 'where your notes live: the biggest folders, du-style.' },
+  random:    { label: 'random note', wide: false, on: false, desc: 'a peek at one note, a new one each day, like cat on a random file.' },
+  git:       { label: 'git log',     wide: false, on: false, desc: 'the latest commits, when the vault is a git repository.' },
+  streak:    { label: 'streak',      wide: true,  on: true,  desc: 'a contribution-style grid of the days you wrote, with your current streak.' },
+  quote:     { label: 'fortune',     wide: false, on: false, desc: 'one line from your own list, a new one each day.' },
+  shell:     { label: 'terminal',    wide: true,  on: true,  desc: 'a terminal window you can type into: open and search notes, add to your inbox, run a timer, and more. type help.' },
 };
 const SECTION_IDS = Object.keys(SECTION_META);
 
@@ -173,21 +180,11 @@ const DEFAULT_QUOTES = [
   'the best note is the one you actually wrote.',
 ].join('\n');
 
-const FETCH_FIELDS = {
-  user:    'user@host',
-  os:      'os',
-  app:     'obsidian version',
-  vault:   'vault path',
-  notes:   'notes',
-  links:   'links',
-  tags:    'tags',
-  folders: 'folders',
-  files:   'files',
-  size:    'size',
-  theme:   'theme',
-  plugins: 'plugins',
-  uptime:  'uptime',
-};
+const DEFAULT_LINKS = [
+  'github | https://github.com',
+  'youtube | https://youtube.com',
+  'mail | https://mail.google.com',
+].join('\n');
 
 const DEFAULT_SETTINGS = {
   lowercaseUi: true,        /* settings text in lowercase (true) or sentence case (false) */
@@ -221,9 +218,10 @@ const DEFAULT_SETTINGS = {
 
   sections: SECTION_IDS.map((id) => ({ id, on: SECTION_META[id].on, wide: SECTION_META[id].wide })),
 
-  banner: { source: 'vault', custom: '', style: 'blocks', letters: 'lower', size: 7, gradient: 'rainbow', align: 'left' },
+  banner: { source: 'vault', custom: '', style: 'blocks', letters: 'lower', size: 6, gradient: 'rainbow', align: 'left' },
 
   greeting: {
+    summary: true,
     template: '{greeting}, {name}.',
     showDate: true,
     dateFormat: 'dddd · D MMMM YYYY',
@@ -234,27 +232,42 @@ const DEFAULT_SETTINGS = {
 
   shortcuts: { items: DEFAULT_SHORTCUTS, layout: 'list', colour: 'plain', hotkeys: true, hideMissing: true },
 
-  fetch: {
-    fields: { user: true, os: true, app: false, vault: true, notes: true, links: true, tags: false, folders: true, files: true, size: true, theme: false, plugins: false, uptime: true },
-    colourBar: true,
-  },
-
   recent: { mode: 'opened', count: 8, types: 'notes', extensions: 'hide', nameColour: 'rainbow', age: true, folder: false, tree: true },
 
   pinned: { paths: '', bookmarks: true, extensions: 'hide', nameColour: 'rainbow', tree: true },
 
   tasks: { count: 6, scan: 40, complete: true, showNote: true },
 
-  streak: { metric: 'edits', weeks: 0, colour: 'green', shape: 'square', cell: 11, gap: 3, dayLabels: true, monthLabels: true, summary: true },
+  streak: { metric: 'edits', weeks: 0, colour: 'green', shape: 'square', cell: 10, gap: 2, dayLabels: true, monthLabels: true, summary: true },
 
   quote: { lines: DEFAULT_QUOTES, mode: 'daily' },
 
-  shell: { outputLines: 8, placeholder: 'type a command · help' },
+  calendar: { mark: 'activity', weekNumbers: false, arrows: true },
+  focus: { focusMin: 25, breakMin: 5, longBreakMin: 15, longEvery: 4, autoNext: false, notify: true },
+  links: { items: DEFAULT_LINKS, layout: 'list', colour: 'plain' },
+  tags: { count: 8 },
+  folders: { count: 6, depth: 1 },
+  random: { lines: 6, mode: 'daily', minChars: 120 },
+  system: { cpu: true, memory: true, battery: true, uptime: true, network: false, barWidth: 14 },
+  git: { count: 5 },
+  terminal: {
+    style: 'window',                       /* window | plain */
+    titleBar: true,
+    title: '{user}@{host}: {path}',
+    height: 4,                             /* lines of scrollback */
+    prompt: 'powerline',                   /* powerline | compact */
+    rprompt: true,                         /* the time on the right of the prompt */
+    suggest: true,                         /* grey autosuggestions from your history (press → to accept) */
+    welcome: true,
+    placeholder: 'type a command · help',
+    capture: 'daily',                      /* daily | inbox: where "add" and "todo add" write */
+    inbox: 'inbox.md',
+  },
 
   daily: { folder: '', format: '' },    /* empty = whatever the core daily notes plugin says, else the vault root and YYYY-MM-DD */
 
   /* the card */
-  layout: { frame: 'one', columns: 2, width: 860, gap: 16, inner: 16, fit: 'shrink', minScale: 55 },   /* frame: one | each | none. fit: shrink | scroll */
+  layout: { frame: 'one', columns: 3, width: 1100, gap: 14, inner: 14, fit: 'shrink', minScale: 55 },   /* frame: one | each | none. fit: shrink | scroll */
   card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 12, pad: 16, textSize: 100 },
 };
 
@@ -265,6 +278,8 @@ const sanitise = (cfg) => {
   if (!Array.isArray(p.colours) || p.colours.length !== 6 || !p.colours.every((c) => HEX.test(c))) {
     p.colours = DARK_FILLS.slice();
   }
+  delete cfg.fetch;      /* the fastfetch section was removed */
+  delete cfg.shell;      /* replaced by cfg.terminal */
   cfg.lowercaseUi = cfg.lowercaseUi !== false;
   cfg.lowercaseText = cfg.lowercaseText !== false;
   cfg.startup = oneOf(cfg.startup, ['always', 'empty', 'never'], 'always');
@@ -287,12 +302,12 @@ const sanitise = (cfg) => {
   cfg.sections = list;
 
   const b = cfg.banner;
-  b.source = oneOf(b.source, ['vault', 'name', 'custom'], 'vault');
+  b.source = oneOf(b.source, ['vault', 'name', 'time', 'custom'], 'vault');
   b.style = oneOf(b.style, ['blocks', 'text'], 'blocks');
   b.gradient = oneOf(b.gradient, ['rainbow', 'accent', 'pink', 'plain'], 'rainbow');
   b.align = oneOf(b.align, ['left', 'centre'], 'left');
   b.letters = oneOf(b.letters, ['lower', 'caps'], 'lower');
-  b.size = num(b.size, 3, 14, 7);
+  b.size = num(b.size, 3, 14, 6);
 
   const g = cfg.greeting;
   g.barWidth = num(g.barWidth, 8, 40, 24);
@@ -321,18 +336,41 @@ const sanitise = (cfg) => {
   st.colour = oneOf(st.colour, SLOTS.map((x) => x.name).concat('rainbow'), 'green');
   st.shape = oneOf(st.shape, ['square', 'round'], 'square');
   st.weeks = num(st.weeks, 0, 53, 0);
-  st.cell = num(st.cell, 6, 20, 11);
-  st.gap = num(st.gap, 1, 8, 3);
+  st.cell = num(st.cell, 6, 20, 10);
+  st.gap = num(st.gap, 1, 8, 2);
 
   cfg.quote.mode = oneOf(cfg.quote.mode, ['daily', 'random'], 'daily');
-  cfg.shell.outputLines = num(cfg.shell.outputLines, 2, 16, 8);
+
+  cfg.greeting.summary = cfg.greeting.summary !== false;
+  cfg.calendar.mark = oneOf(cfg.calendar.mark, ['activity', 'daily', 'none'], 'activity');
+  const fo = cfg.focus;
+  fo.focusMin = num(fo.focusMin, 1, 180, 25);
+  fo.breakMin = num(fo.breakMin, 1, 60, 5);
+  fo.longBreakMin = num(fo.longBreakMin, 1, 120, 15);
+  fo.longEvery = num(fo.longEvery, 2, 12, 4);
+  cfg.links.layout = oneOf(cfg.links.layout, ['list', 'row'], 'list');
+  cfg.links.colour = oneOf(cfg.links.colour, ['plain', 'rainbow'], 'plain');
+  cfg.tags.count = num(cfg.tags.count, 1, 20, 8);
+  cfg.folders.count = num(cfg.folders.count, 1, 20, 6);
+  cfg.folders.depth = num(cfg.folders.depth, 1, 3, 1);
+  cfg.random.lines = num(cfg.random.lines, 2, 20, 6);
+  cfg.random.mode = oneOf(cfg.random.mode, ['daily', 'random'], 'daily');
+  cfg.random.minChars = num(cfg.random.minChars, 0, 2000, 120);
+  cfg.system.barWidth = num(cfg.system.barWidth, 6, 30, 14);
+  cfg.git.count = num(cfg.git.count, 1, 20, 5);
+  const tm = cfg.terminal;
+  tm.style = oneOf(tm.style, ['window', 'plain'], 'window');
+  tm.prompt = oneOf(tm.prompt, ['powerline', 'compact'], 'powerline');
+  tm.capture = oneOf(tm.capture, ['daily', 'inbox'], 'daily');
+  tm.height = num(tm.height, 2, 20, 4);
+  if (typeof tm.inbox !== 'string' || !tm.inbox.trim()) tm.inbox = 'inbox.md';
 
   const l = cfg.layout;
   l.frame = oneOf(l.frame, ['one', 'each', 'none'], 'one');
-  l.columns = Number(l.columns) === 1 ? 1 : 2;
-  l.width = num(l.width, 420, 1400, 860);
-  l.gap = num(l.gap, 0, 40, 16);
-  l.inner = num(l.inner, 0, 40, 16);
+  l.columns = oneOf(Number(l.columns), [1, 2, 3], 2);
+  l.width = num(l.width, 420, 1400, 1100);
+  l.gap = num(l.gap, 0, 40, 14);
+  l.inner = num(l.inner, 0, 40, 14);
   l.fit = oneOf(l.fit, ['shrink', 'scroll'], 'shrink');
   l.minScale = num(l.minScale, 30, 100, 55);
 
@@ -514,6 +552,12 @@ const fmtUp = (ms) => {
   return s + 's';
 };
 
+const hashStr = (str) => {
+  let h = 0;
+  for (const ch of String(str)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h;
+};
+
 /* comma or newline separated list, trimmed, lowercase, empties dropped */
 const parseList = (text) => String(text || '')
   .split(/[,\n]/)
@@ -598,7 +642,7 @@ const BANNER_FONT = {
   6: '.###.|#....|####.|#...#|.###.', 7: '#####|....#|...#.|..#..|..#..', 8: '.###.|#...#|.###.|#...#|.###.',
   9: '.###.|#...#|.####|....#|.###.',
   '.': '.|.|.|.|#', '-': '...|...|###|...|...', _: '.....|.....|.....|.....|#####',
-  '/': '....#|...#.|..#..|.#...|#....', ' ': '...|...|...|...|...',
+  '/': '....#|...#.|..#..|.#...|#....', ':': '.|#|.|#|.', ' ': '...|...|...|...|...',
 };
 
 /* the lowercase face: 9 rows. rows 0-1 are where ascenders (b d f h k l t) and the dot of an i / j
@@ -635,6 +679,7 @@ const BANNER_LOWER = {
   '-': '...|...|...|...|###|...|...|...|...',
   _: '.....|.....|.....|.....|.....|.....|.....|#####|.....',
   '/': '....#|....#|...#.|..#..|..#..|.#...|#....|#....|.....',
+  ':': '.|.|.|#|.|#|.|.|.',
   ' ': '...|...|...|...|...|...|...|...|...',
 };
 /* digits sit at x-height, so they reuse the five-row capital digits */
@@ -731,6 +776,29 @@ class CommandPicker extends FuzzySuggestModal {
 
 let UID = 0;
 
+/* ── terminal output ─────────────────────────────────────────────────────
+   a command returns lines. a line is a string, or an array of pieces: a plain string, or
+   { t: text, c: colour class, file, line | run: a command | url }. file / run / url make the
+   piece clickable. */
+const T = (t, c) => ({ t, c });
+const LINK = (t, file, c, line) => ({ t, c, file, line });
+const RUN = (t, run, c) => ({ t, c, run });
+const GO = (t, url, c) => ({ t, c, url });
+const CLEAR = Symbol('clear');
+
+class CmdError extends Error {
+  constructor(message, lines) {
+    super(message);
+    this.lines = lines || null;
+  }
+}
+
+const toLines = (out) => {
+  if (out == null) return [];
+  if (typeof out === 'string') return out.split('\n');
+  return Array.isArray(out) ? out : [String(out)];
+};
+
 /* ═══════════════════════════════════════════════════════════════════════
    the plugin
    ═══════════════════════════════════════════════════════════════════════ */
@@ -749,17 +817,40 @@ class MishHome extends Plugin {
     const saved = (await this.loadData()) || {};
     this.settings = sanitise(deepMerge(clone(DEFAULT_SETTINGS), saved.settings || {}));
     uiCase.lower = this.settings.lowercaseUi;
-    /* 1.0.0 saved the old section layout; the new default (no fastfetch, greeting beside shortcuts) applies once */
-    if ((saved.v || 0) < 2) this.settings.sections = clone(DEFAULT_SETTINGS.sections);
+    /* older versions saved an older section list; the new default (calendar, system, terminal, no fastfetch) applies once */
+    if ((saved.v || 0) < 3) {
+      const d = DEFAULT_SETTINGS;
+      this.settings.sections = clone(d.sections);
+      this.settings.layout = clone(d.layout);                 /* three columns, shrink to fit */
+      this.settings.banner.size = d.banner.size;
+      this.settings.streak.cell = d.streak.cell;
+      this.settings.streak.gap = d.streak.gap;
+    }
     this.opened = Array.isArray(saved.opened) ? saved.opened.filter((p) => typeof p === 'string').slice(0, 60) : [];
     this.history = Array.isArray(saved.history) ? saved.history.filter((p) => typeof p === 'string').slice(-60) : [];
     this.activity = {};
+    this.focusLog = {};
+    if (isPlain(saved.focusLog)) {
+      const cut = dayKey(Date.now() - 60 * 86400000);
+      for (const k of Object.keys(saved.focusLog)) if (k >= cut && Number.isFinite(saved.focusLog[k])) this.focusLog[k] = saved.focusLog[k];
+    }
+    this.scrollback = [];          /* the terminal's history for this session */
+    this.cwd = '';                 /* the terminal's working folder ('' = vault root) */
+    this.lastOk = true;            /* did the last terminal command succeed? */
+    this.focus = { mode: 'focus', running: false, endsAt: 0, left: 0 };
+    this.cpuPrev = null;
+    this.cpuLast = null;
+    this.battery = null;
     if (isPlain(saved.activity)) {
       const cutoff = dayKey(Date.now() - 400 * 86400000);
       for (const k of Object.keys(saved.activity)) {
         if (/^\d{4}-\d{2}-\d{2}$/.test(k) && k >= cutoff && Number.isFinite(saved.activity[k])) this.activity[k] = saved.activity[k];
       }
     }
+
+    this.focus.left = this.focusLen('focus');
+    this.cpuNow();
+    this.refreshBattery();
 
     this.registerView(VIEW_TYPE, (leaf) => new HomeView(leaf, this));
     this.addSettingTab(new HomeSettingTab(this.app, this));
@@ -776,6 +867,11 @@ class MishHome extends Plugin {
         const view = leaf && leaf.view;
         if (view && view.focusShell) window.setTimeout(() => view.focusShell(), 60);
       },
+    });
+    this.addCommand({
+      id: 'focus-toggle',
+      name: 'Start or pause the focus timer',
+      callback: () => { this.focusToggle(); for (const v of this.views) v.updateFocus(); },
     });
     this.addCommand({ id: 'refresh-home', name: 'Redraw home', callback: () => this.rebuildAll() });
 
@@ -811,12 +907,16 @@ class MishHome extends Plugin {
     this.registerEvent(vault.on('modify', (file) => {
       this.trackEdit(file);
       this.statsCache = null;
-      this.refreshSoon(['recent', 'streak', 'fetch'], 2500);
+      this.refreshSoon(['recent', 'streak', 'calendar', 'tags', 'folders'], 2500);
     }));
-    this.registerEvent(this.app.metadataCache.on('changed', () => this.refreshSoon(['tasks', 'fetch'], 1500)));
+    this.registerEvent(this.app.metadataCache.on('changed', () => this.refreshSoon(['tasks', 'tags', 'folders'], 1500)));
 
     /* keeps the clock and the uptime ticking */
+    let beat = 0;
     this.registerInterval(window.setInterval(() => {
+      beat++;
+      this.focusTick();
+      if (beat % 60 === 0) this.refreshBattery();
       for (const view of this.views) view.tick();
     }, 1000));
   }
@@ -966,30 +1066,63 @@ class MishHome extends Plugin {
     return { folder: folder.replace(/^\/+|\/+$/g, ''), format, template };
   }
 
-  async openDaily() {
-    const { folder, format, template } = this.dailyConfig();
-    const now = moment();
-    const name = now.format(format);
-    const path = normalizePath((folder ? folder + '/' : '') + name + '.md');
+  dailyPath(m) {
+    const { folder, format } = this.dailyConfig();
+    return normalizePath((folder ? folder + '/' : '') + m.format(format) + '.md');
+  }
+
+  dailyExists(m) {
+    return this.app.vault.getAbstractFileByPath(this.dailyPath(m)) instanceof TFile;
+  }
+
+  /* the daily note for a date (today by default), made from the template if it does not exist yet */
+  async dailyFile(m) {
+    const when = m || moment();
+    const { format, template } = this.dailyConfig();
+    const name = when.format(format);
+    const path = this.dailyPath(when);
     let file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof TFile)) {
-      const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-      if (dir) await this.ensureFolder(dir);
-      let body = '';
-      if (template) {
-        const t = this.app.metadataCache.getFirstLinkpathDest(template.replace(/\.md$/i, ''), '');
-        if (t) {
-          const title = name.split('/').pop();
-          body = (await this.app.vault.read(t)).replace(/{{\s*(date|time|title)\s*(?::([^}]*))?}}/gi, (m, kind, fmt) => {
-            const k = kind.toLowerCase();
-            if (k === 'title') return title;
-            return now.format((fmt || '').trim() || (k === 'date' ? 'YYYY-MM-DD' : 'HH:mm'));
-          });
-        }
+    if (file instanceof TFile) return file;
+    const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    if (dir) await this.ensureFolder(dir);
+    let body = '';
+    if (template) {
+      const t = this.app.metadataCache.getFirstLinkpathDest(template.replace(/\.md$/i, ''), '');
+      if (t) {
+        const title = name.split('/').pop();
+        body = (await this.app.vault.read(t)).replace(/{{\s*(date|time|title)\s*(?::([^}]*))?}}/gi, (x, kind, fmt) => {
+          const k = kind.toLowerCase();
+          if (k === 'title') return title;
+          return when.format((fmt || '').trim() || (k === 'date' ? 'YYYY-MM-DD' : 'HH:mm'));
+        });
       }
-      file = await this.app.vault.create(path, body);
     }
+    file = await this.app.vault.create(path, body);
+    return file;
+  }
+
+  async openDaily(m) {
+    const file = await this.dailyFile(m);
     await this.openFile(file);
+    return file;
+  }
+
+  /* "add" and "todo add" in the terminal: a line at the end of today's daily note, or your inbox note */
+  async capture(text, kind) {
+    const t = this.settings.terminal;
+    let file;
+    if (t.capture === 'inbox') {
+      const path = normalizePath(t.inbox.trim());
+      file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) {
+        if (path.includes('/')) await this.ensureFolder(path.slice(0, path.lastIndexOf('/')));
+        file = await this.app.vault.create(path, '');
+      }
+    } else {
+      file = await this.dailyFile();
+    }
+    const line = kind === 'task' ? '- [ ] ' + text : '- ' + moment().format('HH:mm') + ' ' + text;
+    await this.app.vault.process(file, (data) => data + (data && !data.endsWith('\n') ? '\n' : '') + line + '\n');
     return file;
   }
 
@@ -1001,11 +1134,14 @@ class MishHome extends Plugin {
     return file;
   }
 
-  async createNote(name) {
+  async createNote(name, folder) {
     const base = String(name || 'untitled').replace(/\.md$/i, '').replace(/[\\/:*?"<>|#^[\]]/g, '-').trim() || 'untitled';
     const active = this.app.workspace.getActiveFile();
     let parent = '';
-    try { parent = this.app.fileManager.getNewFileParent(active ? active.path : '').path; } catch (e) { parent = ''; }
+    if (typeof folder === 'string') parent = folder;
+    else {
+      try { parent = this.app.fileManager.getNewFileParent(active ? active.path : '').path; } catch (e) { parent = ''; }
+    }
     if (parent === '/') parent = '';
     let n = 0;
     let path;
@@ -1156,6 +1292,182 @@ class MishHome extends Plugin {
     return m;
   }
 
+  /* ── focus timer ───────────────────────────────────────────────────────────
+     lives here, not in the page, so it keeps counting (and rings) with the tab closed */
+  focusLen(mode) {
+    if (mode === 'focus' && this.focus.custom) return this.focus.custom;      /* "focus 40" in the terminal */
+    const f = this.settings.focus;
+    return (mode === 'focus' ? f.focusMin : mode === 'long' ? f.longBreakMin : f.breakMin) * 60000;
+  }
+
+  focusLeft() {
+    const st = this.focus;
+    return st.running ? Math.max(0, st.endsAt - Date.now()) : st.left;
+  }
+
+  focusStart() {
+    const st = this.focus;
+    if (st.running) return;
+    st.running = true;
+    st.endsAt = Date.now() + st.left;
+  }
+
+  focusPause() {
+    const st = this.focus;
+    if (!st.running) return;
+    st.left = Math.max(1000, st.endsAt - Date.now());
+    st.running = false;
+  }
+
+  focusToggle() { if (this.focus.running) this.focusPause(); else this.focusStart(); }
+
+  focusReset() {
+    const st = this.focus;
+    st.running = false;
+    st.mode = 'focus';
+    st.custom = 0;
+    st.left = this.focusLen('focus');
+  }
+
+  focusSkip() { this.focusFinish(true); }
+
+  /* after the lengths change in settings */
+  focusSync() {
+    const st = this.focus;
+    if (!st.running) st.left = this.focusLen(st.mode);
+  }
+
+  focusToday() { return this.focusLog[dayKey(Date.now())] || 0; }
+
+  focusTick() {
+    const st = this.focus;
+    if (st.running && Date.now() >= st.endsAt) this.focusFinish(false);
+  }
+
+  focusFinish(skipped) {
+    const st = this.focus;
+    const f = this.settings.focus;
+    st.custom = 0;
+    if (st.mode === 'focus') {
+      if (!skipped) {
+        const day = dayKey(Date.now());
+        this.focusLog[day] = (this.focusLog[day] || 0) + 1;
+        this.persist();
+      }
+      const n = this.focusToday();
+      st.mode = !skipped && n > 0 && n % f.longEvery === 0 ? 'long' : 'break';
+      if (f.notify && !skipped) new Notice(ui('focus done. take a ' + (st.mode === 'long' ? 'long ' : '') + 'break.'), 8000);
+    } else {
+      st.mode = 'focus';
+      if (f.notify && !skipped) new Notice(ui('break over. back to it.'), 8000);
+    }
+    st.left = this.focusLen(st.mode);
+    st.running = Boolean(f.autoNext) && !skipped;
+    if (st.running) st.endsAt = Date.now() + st.left;
+    for (const view of this.views) view.updateFocus();
+  }
+
+  /* ── system, for the system section and the top command ─────────────────── */
+  cpuNow() {
+    if (!nodeOs) return null;
+    try {
+      let idle = 0;
+      let total = 0;
+      for (const c of nodeOs.cpus()) {
+        const t = c.times;
+        idle += t.idle;
+        total += t.user + t.nice + t.sys + t.idle + t.irq;
+      }
+      const prev = this.cpuPrev;
+      this.cpuPrev = { idle, total };
+      if (prev && total > prev.total) {
+        this.cpuLast = Math.max(0, Math.min(100, Math.round(100 * (1 - (idle - prev.idle) / (total - prev.total)))));
+      }
+      return this.cpuLast;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  memNow() {
+    if (!nodeOs) return null;
+    try {
+      const total = nodeOs.totalmem();
+      return { total, used: total - nodeOs.freemem() };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  sysUptime() {
+    try { return nodeOs.uptime() * 1000; } catch (e) { return null; }
+  }
+
+  refreshBattery() {
+    try {
+      if (navigator.getBattery) {
+        navigator.getBattery().then((b) => { this.battery = { level: b.level, charging: b.charging }; }).catch(() => { this.battery = null; });
+      }
+    } catch (e) { /* no battery api */ }
+  }
+
+  /* ── git log: the vault's own .git/logs/HEAD, read as plain text. nothing is run. ── */
+  async gitLog(n) {
+    try {
+      const raw = await this.app.vault.adapter.read('.git/logs/HEAD');
+      const out = [];
+      for (const line of raw.trim().split('\n').reverse()) {
+        const tab = line.indexOf('\t');
+        if (tab < 0) continue;
+        const m = line.slice(0, tab).match(/^\w+ (\w+) (.+?) <[^>]*> (\d+) [+-]\d{4}$/);
+        if (!m) continue;
+        out.push({ hash: m[1].slice(0, 7), author: m[2], ts: Number(m[3]) * 1000, msg: line.slice(tab + 1).replace(/^commit(?: \([^)]*\))?: /, '') });
+        if (out.length >= n) break;
+      }
+      return out;
+    } catch (e) {
+      return null;                         /* not a git repository */
+    }
+  }
+
+  topTags(n) {
+    let tags = {};
+    try { tags = this.app.metadataCache.getTags() || {}; } catch (e) { tags = {}; }
+    return Object.entries(tags).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n);
+  }
+
+  folderStats(depth, n) {
+    const ex = parseList(this.settings.exclude);
+    const m = new Map();
+    for (const f of this.app.vault.getMarkdownFiles()) {
+      if (isExcluded(f.path, ex)) continue;
+      const parts = f.path.split('/');
+      parts.pop();
+      const key = parts.length ? parts.slice(0, depth).join('/') : '.';
+      m.set(key, (m.get(key) || 0) + 1);
+    }
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n);
+  }
+
+  /* one note, picked by a seed (the same note all day for "daily") */
+  pickNote(seed) {
+    const r = this.settings.random;
+    const ex = parseList(this.settings.exclude);
+    const files = this.app.vault.getMarkdownFiles()
+      .filter((f) => !isExcluded(f.path, ex) && f.stat.size >= r.minChars)
+      .sort((a, b) => a.path.localeCompare(b.path));
+    if (!files.length) return null;
+    const n = seed == null ? hashStr(dayKey(Date.now())) : Math.floor(seed * 1e6);
+    return files[n % files.length];
+  }
+
+  openUrl(url) {
+    let u = String(url).trim();
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) u = 'https://' + u;
+    if (!/^https?:\/\//i.test(u)) { new Notice(ui('only http and https links can be opened.')); return; }
+    window.open(u, '_blank');
+  }
+
   /* ── refreshing ────────────────────────────────────────────────────────── */
 
   /* ids = list of section ids, or null for all of them */
@@ -1197,8 +1509,9 @@ class MishHome extends Plugin {
 
   async saveAll() {
     await this.saveData({
-      v: 2,
+      v: 3,
       settings: this.settings,
+      focusLog: this.focusLog,
       opened: this.opened,
       activity: this.activity,
       history: this.history.slice(-60),
@@ -1211,6 +1524,7 @@ class MishHome extends Plugin {
    ═══════════════════════════════════════════════════════════════════════ */
 
 const NOTE_CMDS = new Set(['open', 'cat', 'edit', 'vim', 'less']);
+const DIR_CMDS = new Set(['cd', 'ls', 'll', 'tree']);
 
 const tokenise = (text) => {
   const out = [];
@@ -1316,15 +1630,30 @@ class HomeView extends ItemView {
 
     const baseW = Math.min(availW, L.width);
     const floor = L.minScale / 100;
-    let k = 1;
-    let h = 0;
-    for (let i = 0; i < 5; i++) {
+    /* the card is laid out at baseW / k and then scaled by k, so it always ends up baseW wide.
+       a smaller k means a wider layout, which means fewer wrapped lines and maybe more columns,
+       so the visible height (layout height * k) only ever shrinks as k shrinks. bisect for the
+       largest k that fits. */
+    const visible = (k) => {
       card.style.width = (baseW / k) + 'px';
-      h = card.offsetHeight;
-      const next = Math.min(1, Math.max(floor, availH / h));
-      if (Math.abs(next - k) < 0.005) break;
-      k = next;
+      return card.offsetHeight * k;
+    };
+    let k = 1;
+    if (visible(1) > availH) {
+      if (visible(floor) > availH) {
+        k = floor;
+      } else {
+        let lo = floor;
+        let hi = 1;
+        for (let i = 0; i < 9; i++) {
+          const mid = (lo + hi) / 2;
+          if (visible(mid) <= availH) lo = mid; else hi = mid;
+        }
+        k = lo;
+      }
     }
+    card.style.width = (baseW / k) + 'px';
+    const h = card.offsetHeight;
 
     const c = this.s.card;
     const offX = c.hAlign === 'left' ? 0 : Math.max(0, (availW - baseW) / 2);
@@ -1387,10 +1716,11 @@ class HomeView extends ItemView {
     const vars = Object.assign({}, paletteVars(s), layoutVars(s));
     const font = fontStack(s);
     if (font) vars['--vf-mono'] = font;
-    vars['--mh-outlines'] = String(s.shell.outputLines);
+    vars['--mh-termlines'] = String(s.terminal.height);
     applyVars(host, vars);
     setClassGroup(host, 'mh-shape-', s.pillShape);
     setClassGroup(host, 'mh-frame-', s.layout.frame);
+    setClassGroup(host, 'mh-cols-', String(s.layout.columns));
     host.classList.toggle('mh-lower', s.lowercaseText);
     host.classList.toggle('mh-nocmd', !s.showCommands);
     if (this.leaf && this.leaf.updateHeader) this.leaf.updateHeader();     /* picks up a new tab title */
@@ -1421,6 +1751,14 @@ class HomeView extends ItemView {
     const s = this.s;
     switch (id) {
       case 'greeting': return ['hello', ''];
+      case 'calendar': return ['cal', ''];
+      case 'focus': return ['timer', '--pomodoro'];
+      case 'system': return ['top', '-n1'];
+      case 'links': return ['go', ''];
+      case 'tags': return ['tags', '--top=' + s.tags.count];
+      case 'folders': return ['du', '-h --max-depth=' + s.folders.depth];
+      case 'random': return ['cat', ''];
+      case 'git': return ['git', 'log --oneline -n' + s.git.count];
       case 'shortcuts': return ['launch', ''];
       case 'fetch': return ['fastfetch', ''];
       case 'recent': {
@@ -1467,11 +1805,20 @@ class HomeView extends ItemView {
   tick() {
     if (!this.contentEl.isShown()) return;
     if (this.clockEl) setText(this.clockEl, this.clockText());
-    if (this.upEl) setText(this.upEl, fmtUp(performance.now()));
-    const minute = Math.floor(Date.now() / 60000);
+    const now = Date.now();
+    if (this.refs.focus) this.updateFocus();
+    if (this.refs.system && now - (this.sysAt || 0) >= 2000) {
+      this.sysAt = now;
+      const before = this.sysRows;
+      try { this.fill_system(this.refs.system.body); } catch (e) { this.broke('system', e); }
+      if (before !== this.sysRows) this.scheduleFit();      /* the battery row can show up late */
+    }
+    const minute = Math.floor(now / 60000);
     if (minute !== this.minute) {
       this.minute = minute;
-      if (this.refs.greeting) this.fill('greeting');
+      for (const id of ['greeting', 'calendar']) if (this.refs[id]) this.fill(id);
+      if (this.refs.banner && this.s.banner.source === 'time') this.fill('banner');
+      this.updatePrompt();
     }
   }
 
@@ -1519,6 +1866,11 @@ class HomeView extends ItemView {
     body.classList.toggle('is-centre', b.align === 'centre');
     let text = this.app.vault.getName();
     if (b.source === 'name') text = this.userName();
+    else if (b.source === 'time') {
+      const d = new Date();
+      const h = this.s.clock.hour12 ? d.getHours() % 12 || 12 : d.getHours();
+      text = pad(h) + ':' + pad(d.getMinutes());
+    }
     else if (b.source === 'custom' && b.custom.trim()) text = b.custom.trim();
     if (b.style === 'text') {
       body.appendChild(el('div', 'mh-btext mh-grad-' + b.gradient, text));
@@ -1552,6 +1904,26 @@ class HomeView extends ItemView {
     });
     body.appendChild(el('div', 'mh-hello', text));
     if (g.showDate) body.appendChild(el('div', 'mh-date', moment().format(g.dateFormat || 'dddd · D MMMM YYYY')));
+    if (g.summary) {
+      const st = this.plugin.vaultStats();
+      const counts = this.plugin.dayCounts('edits');
+      const has = (d) => (counts.get(dayKey(d.getTime())) || 0) > 0;
+      const cur = new Date();
+      cur.setHours(0, 0, 0, 0);
+      if (!has(cur)) cur.setDate(cur.getDate() - 1);
+      let streak = 0;
+      while (has(cur) && streak < 5000) { streak++; cur.setDate(cur.getDate() - 1); }
+      const sum = el('div', 'mh-gsum');
+      const bit = (n, label, cls) => {
+        if (sum.childNodes.length) sum.appendChild(document.createTextNode(' · '));
+        sum.appendChild(el('span', cls, String(n)));
+        sum.appendChild(document.createTextNode(' ' + label));
+      };
+      bit(st.notes, st.notes === 1 ? 'note' : 'notes', 'mh-t0');
+      bit(st.links, st.links === 1 ? 'link' : 'links', 'mh-t1');
+      bit(streak + 'd', 'streak', 'mh-t3');
+      body.appendChild(sum);
+    }
 
     /* progress bars: each is a row of little cells, coloured along the rainbow */
     const minutes = now.getHours() * 60 + now.getMinutes();
@@ -1604,51 +1976,6 @@ class HomeView extends ItemView {
       row.addEventListener('click', () => this.plugin.runCommand(it.id));
       body.appendChild(row);
     });
-  }
-
-  /* ── fastfetch ─────────────────────────────────────────────────────────── */
-
-  fill_fetch(body) {
-    const f = this.s.fetch;
-    body.replaceChildren();
-    this.upEl = null;
-    const st = this.plugin.vaultStats();
-    const rows = [];
-    const on = f.fields;
-    if (on.user) rows.push(['user', this.userName() + '@' + this.plugin.detected.host]);
-    if (on.os) rows.push(['os', osName() + ' · obsidian', true]);
-    if (on.app) rows.push(['app', 'obsidian ' + (obsidian.apiVersion || '?'), true]);
-    if (on.vault) {
-      let path = this.app.vault.getName();
-      try { path = this.app.vault.adapter.getBasePath() || path; } catch (e) { /* not a desktop adapter */ }
-      rows.push(['vault', path, false, false, true]);
-    }
-    if (on.notes) rows.push(['notes', String(st.notes)]);
-    if (on.links) rows.push(['links', String(st.links)]);
-    if (on.tags) rows.push(['tags', String(st.tags)]);
-    if (on.folders) rows.push(['folders', String(st.folders)]);
-    if (on.files) rows.push(['files', String(st.files)]);
-    if (on.size) rows.push(['size', fmtSize(st.size), true]);
-    if (on.theme) rows.push(['theme', (this.app.customCss && this.app.customCss.theme) || 'default']);
-    if (on.plugins) rows.push(['plugins', String(Object.keys((this.app.plugins && this.app.plugins.plugins) || {}).length)]);
-    if (on.uptime) rows.push(['uptime', fmtUp(performance.now()), false, true]);
-
-    const kv = el('div', 'mh-kv');
-    for (const [k, v, dim, live, keep] of rows) {
-      kv.appendChild(el('span', 'mh-k', k));
-      const val = el('span', 'mh-v' + (dim ? ' is-dim' : '') + (keep ? ' mh-keep' : ''), v);
-      if (live) this.upEl = val;
-      kv.appendChild(val);
-    }
-    body.appendChild(kv);
-    if (f.colourBar) {
-      const pal = el('div', 'mh-pal');
-      pal.appendChild(el('i', 'mh-pal-dark'));
-      for (let i = 0; i < COLOURS; i++) pal.appendChild(el('i', 'mh-bg' + i));
-      pal.appendChild(el('i', 'mh-pal-light'));
-      body.appendChild(pal);
-    }
-    if (!rows.length && !f.colourBar) body.appendChild(this.hint('every field is switched off.'));
   }
 
   /* ── file lists: recent and pinned ─────────────────────────────────────── */
@@ -1921,13 +2248,344 @@ class HomeView extends ItemView {
     body.appendChild(el('div', 'mh-quote', lines[at]));
   }
 
-  /* ── the shell ─────────────────────────────────────────────────────────── */
+  /* ══════════════════════════════════════════════════════════════════════
+     more sections
+     ══════════════════════════════════════════════════════════════════════ */
 
-  say(text, kind) {
+  /* a row of little cells. mode 'high' = fuller is worse (cpu, memory), 'low' = emptier is worse (battery) */
+  barEl(frac, n, mode) {
+    const f = Math.max(0, Math.min(1, frac));
+    const bar = el('span', 'mh-pbar');
+    const on = Math.round(f * n);
+    const lvl = mode === 'low' ? (f < 0.2 ? 'bad' : f < 0.4 ? 'warn' : 'ok') : (f > 0.85 ? 'bad' : f > 0.6 ? 'warn' : 'ok');
+    for (let i = 0; i < n; i++) bar.appendChild(el('i', i < on ? 'on mh-lv-' + lvl : ''));
+    return bar;
+  }
+
+  openSearch(query) {
+    const gs = this.app.internalPlugins && this.app.internalPlugins.getPluginById && this.app.internalPlugins.getPluginById('global-search');
+    if (gs && gs.instance && gs.instance.openGlobalSearch) gs.instance.openGlobalSearch(query);
+    else this.plugin.runCommand('global-search:open');
+  }
+
+  /* ── calendar ──────────────────────────────────────────────────────────── */
+
+  fill_calendar(body) {
+    const c = this.s.calendar;
+    body.replaceChildren();
+    if (!this.calMonth) this.calMonth = moment().startOf('month');
+    const month = this.calMonth.clone();
+    const today = moment().format('YYYY-MM-DD');
+    const marks = c.mark === 'none' ? null : this.plugin.dayCounts(c.mark === 'daily' ? 'daily' : 'edits');
+
+    const head = el('div', 'mh-calhead');
+    const step = (n) => { this.calMonth = this.calMonth.clone().add(n, 'months'); this.fill('calendar'); };
+    if (c.arrows) {
+      const prev = el('span', 'mh-calbtn', '←');
+      prev.title = 'previous month';
+      prev.addEventListener('click', () => step(-1));
+      head.appendChild(prev);
+    }
+    const title = el('span', 'mh-caltitle', month.format('MMMM YYYY'));
+    title.title = 'back to this month';
+    title.addEventListener('click', () => { this.calMonth = moment().startOf('month'); this.fill('calendar'); });
+    head.appendChild(title);
+    if (c.arrows) {
+      const next = el('span', 'mh-calbtn', '→');
+      next.title = 'next month';
+      next.addEventListener('click', () => step(1));
+      head.appendChild(next);
+    }
+    body.appendChild(head);
+
+    const startDow = this.s.weekStart === 'sun' ? 0 : 1;
+    const grid = el('div', 'mh-cal' + (c.weekNumbers ? ' has-wk' : ''));
+    if (c.weekNumbers) grid.appendChild(el('span', 'mh-calwd', 'wk'));
+    for (let i = 0; i < 7; i++) grid.appendChild(el('span', 'mh-calwd', DAYS[(startDow + i) % 7].slice(0, 2)));
+    const offset = (month.day() - startDow + 7) % 7;
+    const start = month.clone().subtract(offset, 'days');
+    const weeks = Math.ceil((offset + month.daysInMonth()) / 7);
+    for (let w = 0; w < weeks; w++) {
+      if (c.weekNumbers) grid.appendChild(el('span', 'mh-calwk', String(start.clone().add(w * 7 + 3, 'days').isoWeek())));
+      for (let d = 0; d < 7; d++) {
+        const day = start.clone().add(w * 7 + d, 'days');
+        const key = day.format('YYYY-MM-DD');
+        const n = marks ? marks.get(key) || 0 : 0;
+        const cell = el('span', 'mh-day' + (day.month() !== month.month() ? ' is-out' : '') + (key === today ? ' is-today' : '') + (n > 0 ? ' has-note' : ''), String(day.date()));
+        cell.title = key + (n ? ' · ' + n : '') + ' · click to open the daily note';
+        cell.addEventListener('click', () => this.plugin.openDaily(day.clone()));
+        grid.appendChild(cell);
+      }
+    }
+    body.appendChild(grid);
+  }
+
+  /* ── focus timer ───────────────────────────────────────────────────────── */
+
+  fill_focus(body) {
+    body.replaceChildren();
+    const f = {};
+    const top = el('div', 'mh-fotop');
+    f.mode = el('span', 'mh-fomode');
+    f.time = el('span', 'mh-fotime');
+    top.appendChild(f.mode);
+    top.appendChild(f.time);
+    body.appendChild(top);
+
+    f.bar = el('span', 'mh-pbar mh-fobar');
+    f.cells = [];
+    const N = 28;
+    for (let i = 0; i < N; i++) {
+      const cell = el('i', 'mh-c' + Math.min(COLOURS - 1, Math.floor((i / N) * COLOURS)));
+      f.bar.appendChild(cell);
+      f.cells.push(cell);
+    }
+    body.appendChild(f.bar);
+
+    const btns = el('div', 'mh-fobtns');
+    const mk = (label, fn) => {
+      const b = el('span', 'mh-btn', label);
+      b.addEventListener('click', () => { fn(); for (const v of this.plugin.views) v.updateFocus(); });
+      btns.appendChild(b);
+      return b;
+    };
+    f.toggle = mk('start', () => this.plugin.focusToggle());
+    mk('reset', () => this.plugin.focusReset());
+    mk('skip', () => this.plugin.focusSkip());
+    body.appendChild(btns);
+    f.sum = el('div', 'mh-fosum');
+    body.appendChild(f.sum);
+    this.focusRefs = f;
+    this.updateFocus();
+  }
+
+  /* redraws only what changes every second, so the section never flickers */
+  updateFocus() {
+    const f = this.focusRefs;
+    if (!f || !f.time.isConnected) return;
+    const p = this.plugin;
+    const st = p.focus;
+    const left = p.focusLeft();
+    const total = p.focusLen(st.mode);
+    const secs = Math.ceil(left / 1000);
+    setText(f.time, pad(Math.floor(secs / 60)) + ':' + pad(secs % 60));
+    setText(f.mode, st.mode === 'focus' ? 'focus' : st.mode === 'long' ? 'long break' : 'break');
+    const cls = 'mh-fomode ' + (st.mode === 'focus' ? 'mh-t0' : 'mh-t3');
+    if (f.mode.className !== cls) f.mode.className = cls;
+    const on = Math.round((total > 0 ? 1 - left / total : 0) * f.cells.length);
+    f.cells.forEach((cell, i) => cell.classList.toggle('on', i < on));
+    setText(f.toggle, st.running ? 'pause' : left < total ? 'resume' : 'start');
+    const n = p.focusToday();
+    setText(f.sum, n + (n === 1 ? ' session' : ' sessions') + ' today');
+  }
+
+  /* ── links ─────────────────────────────────────────────────────────────── */
+
+  fill_links(body) {
+    const l = this.s.links;
+    body.replaceChildren();
+    const items = parseShortcuts(l.items);
+    if (!items.length) { body.appendChild(this.hint('no links. add some in settings.')); return; }
+    body.classList.toggle('is-row', l.layout === 'row');
+    items.forEach((it, i) => {
+      const row = el('div', 'mh-sc');
+      row.appendChild(el('span', 'mh-chev mh-c' + (i % COLOURS), '❯'));
+      row.appendChild(el('span', 'mh-sclabel' + (l.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), it.label));
+      let host = '';
+      try { host = new URL(/^[a-z]+:\/\//i.test(it.id) ? it.id : 'https://' + it.id).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
+      if (host && l.layout !== 'row') row.appendChild(el('span', 'mh-kbd', host));
+      row.title = it.id;
+      row.addEventListener('click', () => this.plugin.openUrl(it.id));
+      body.appendChild(row);
+    });
+  }
+
+  /* ── tags and folders: little bar charts ───────────────────────────────── */
+
+  barRows(body, rows, nameClass, onClick) {
+    const max = rows.length ? rows[0][1] : 1;
+    const list = el('div', 'mh-bars');
+    rows.forEach(([name, n], i) => {
+      const row = el('div', 'mh-brow');
+      row.appendChild(el('span', 'mh-name ' + nameClass(i), name));
+      const bar = el('span', 'mh-pbar mh-minibar');
+      const on = Math.max(1, Math.round((n / max) * 10));
+      for (let k = 0; k < 10; k++) bar.appendChild(el('i', k < on ? 'on mh-c' + (i % COLOURS) : ''));
+      row.appendChild(bar);
+      row.appendChild(el('span', 'mh-age', String(n)));
+      row.addEventListener('click', () => onClick(name));
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+  }
+
+  fill_tags(body) {
+    body.replaceChildren();
+    const list = this.plugin.topTags(this.s.tags.count);
+    if (!list.length) { body.appendChild(this.hint('no tags yet. write #something.')); return; }
+    this.barRows(body, list, (i) => 'mh-c' + (i % COLOURS), (tag) => this.openSearch('tag:' + tag));
+  }
+
+  fill_folders(body) {
+    body.replaceChildren();
+    const f = this.s.folders;
+    const list = this.plugin.folderStats(f.depth, f.count);
+    if (!list.length) { body.appendChild(this.hint('no notes yet.')); return; }
+    this.barRows(body, list.map(([name, n]) => [name === '.' ? './' : name + '/', n]), () => 'mh-t4', (name) => {
+      if (name !== './') this.exec('ls "' + name.replace(/\/$/, '') + '"');
+    });
+  }
+
+  /* ── random note: a peek, like cat ─────────────────────────────────────── */
+
+  async fill_random(body) {
+    const r = this.s.random;
+    const token = (this.randToken = (this.randToken || 0) + 1);
+    const file = this.plugin.pickNote(r.mode === 'random' ? this.quoteSeed : null);
+    if (!file) { body.replaceChildren(this.hint('no notes long enough yet.')); return; }
+    const text = await this.app.vault.cachedRead(file);
+    if (token !== this.randToken || !body.isConnected) return;
+    body.replaceChildren();
+    if (this.refs.random && this.refs.random.arg) setText(this.refs.random.arg, '"' + file.basename + '.md"');
+    const title = el('div', 'mh-rtitle mh-t1', file.basename);
+    title.addEventListener('click', (ev) => this.plugin.openFile(file, ev));
+    body.appendChild(title);
+    const lines = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').split(/\r?\n/)
+      .map((l) => l.replace(/^#+\s*/, '').replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/[*_`>]/g, '').trim())
+      .filter(Boolean)
+      .slice(0, r.lines);
+    lines.forEach((l, i) => {
+      const row = el('div', 'mh-rline');
+      row.appendChild(el('span', 'mh-rnum', String(i + 1)));
+      row.appendChild(el('span', 'mh-rtext', l));
+      row.addEventListener('click', (ev) => this.plugin.openFile(file, ev, i));
+      body.appendChild(row);
+    });
+    if (!lines.length) body.appendChild(this.hint('(empty note)'));
+  }
+
+  /* ── system ────────────────────────────────────────────────────────────── */
+
+  fill_system(body) {
+    const s = this.s.system;
+    const p = this.plugin;
+    body.replaceChildren();
+    const kv = el('div', 'mh-sys');
+    let rows = 0;
+    const row = (key, frac, text, mode) => {
+      rows++;
+      kv.appendChild(el('span', 'mh-k', key));
+      const v = el('span', 'mh-sv');
+      if (frac != null) v.appendChild(this.barEl(frac, s.barWidth, mode));
+      v.appendChild(el('span', 'mh-sval', text));
+      kv.appendChild(v);
+    };
+    if (s.cpu) {
+      const c = p.cpuNow();
+      row('cpu', c == null ? null : c / 100, c == null ? '…' : c + '%', 'high');
+    }
+    if (s.memory) {
+      const m = p.memNow();
+      if (m) row('mem', m.used / m.total, (m.used / 1073741824).toFixed(1) + '/' + (m.total / 1073741824).toFixed(0) + 'g', 'high');
+    }
+    if (s.battery && p.battery) row('batt', p.battery.level, Math.round(p.battery.level * 100) + '%' + (p.battery.charging ? ' ⚡' : ''), 'low');
+    if (s.uptime) {
+      const up = p.sysUptime();
+      row('up', null, (up == null ? '' : fmtUp(up) + ' · ') + 'obsidian ' + fmtUp(performance.now()));
+    }
+    if (s.network) row('net', null, navigator.onLine ? 'online' : 'offline');
+    this.sysRows = rows;
+    if (!rows) body.appendChild(this.hint('every row is switched off.'));
+    else body.appendChild(kv);
+  }
+
+  /* ── git log ───────────────────────────────────────────────────────────── */
+
+  async fill_git(body) {
+    const list = await this.plugin.gitLog(this.s.git.count);
+    if (!body.isConnected) return;
+    body.replaceChildren();
+    if (list === null) { body.appendChild(this.hint('not a git repository.')); return; }
+    if (!list.length) { body.appendChild(this.hint('no commits yet.')); return; }
+    for (const c of list) {
+      const row = el('div', 'mh-gl');
+      row.appendChild(el('span', 'mh-t2', c.hash));
+      const msg = el('span', 'mh-glmsg', c.msg);
+      msg.title = c.msg;
+      row.appendChild(msg);
+      row.appendChild(el('span', 'mh-age', ageOf(c.ts)));
+      body.appendChild(row);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     the terminal
+     ══════════════════════════════════════════════════════════════════════ */
+
+  cwdLabel() {
+    return (this.s.pathLabel || '~/' + this.app.vault.getName()) + (this.plugin.cwd ? '/' + this.plugin.cwd : '');
+  }
+
+  termTitle() {
+    return this.s.terminal.title.replace(/\{(user|host|path|vault)\}/g, (m, k) => (
+      k === 'user' ? this.userName() : k === 'host' ? this.plugin.detected.host : k === 'path' ? this.cwdLabel() : this.app.vault.getName()
+    ));
+  }
+
+  /* one line of output. pieces with file / run / url are clickable. */
+  lineEl(line) {
+    const d = el('div', 'mh-ln');
+    const parts = Array.isArray(line) ? line : [line];
+    for (const part of parts) {
+      if (part == null) continue;
+      if (typeof part === 'string') { d.appendChild(document.createTextNode(part)); continue; }
+      const sp = el('span', part.c ? 'mh-' + part.c : '', part.t);
+      if (part.file) {
+        sp.classList.add('is-link');
+        sp.title = part.file.path;
+        sp.addEventListener('click', (ev) => this.plugin.openFile(part.file, ev, part.line));
+      } else if (part.run) {
+        sp.classList.add('is-link');
+        sp.title = part.run;
+        sp.addEventListener('click', () => this.exec(part.run));
+      } else if (part.url) {
+        sp.classList.add('is-link');
+        sp.title = part.url;
+        sp.addEventListener('click', () => this.plugin.openUrl(part.url));
+      }
+      d.appendChild(sp);
+    }
+    if (!d.childNodes.length) d.appendChild(document.createTextNode('\u00a0'));
+    return d;
+  }
+
+  entryEl(e) {
+    const box = el('div', 'mh-te');
+    const c = el('div', 'mh-ln mh-tcmd');
+    c.appendChild(el('span', 'mh-chev' + (e.ok ? '' : ' is-bad'), '❯'));
+    c.appendChild(document.createTextNode(' '));
+    const code = el('span', 'mh-tcode');
+    this.paintLine(code, e.cmd);
+    c.appendChild(code);
+    box.appendChild(c);
+    for (const l of e.lines) box.appendChild(this.lineEl(l));
+    return box;
+  }
+
+  welcomeEl() {
+    const box = el('div', 'mh-te is-welcome');
+    box.appendChild(this.lineEl([T('mish.home', 't0'), T(' · type ', 'dim'), T('help', 't3'), T(' for commands · tab completes · ', 'dim'), T('/', 't3'), T(' jumps here', 'dim')]));
+    return box;
+  }
+
+  renderScrollback() {
     const sh = this.refs.shell;
     if (!sh || !sh.out) return;
-    sh.out.className = 'mh-out' + (kind ? ' is-' + kind : '');
-    sh.out.textContent = Array.isArray(text) ? text.join('\n') : String(text == null ? '' : text);
+    sh.out.replaceChildren();
+    const sb = this.plugin.scrollback;
+    if (!sb.length && this.s.terminal.welcome) sh.out.appendChild(this.welcomeEl());
+    for (const e of sb) sh.out.appendChild(this.entryEl(e));
+    sh.out.scrollTop = sh.out.scrollHeight;
   }
 
   paintLine(host, text) {
@@ -1948,41 +2606,109 @@ class HomeView extends ItemView {
     }
   }
 
-  fill_shell(body) {
-    body.replaceChildren();
-    const out = el('div', 'mh-out');
-    out.addEventListener('click', () => this.say(''));       /* click the output to dismiss it */
-    body.appendChild(out);
+  /* the powerline line above the prompt: where you are, the git branch, did the last command work */
+  updatePrompt() {
+    const sh = this.refs.shell;
+    if (!sh || !sh.pl) return;
+    const t = this.s.terminal;
+    const ok = this.plugin.lastOk;
+    sh.chev.classList.toggle('is-bad', !ok);
+    sh.pl.replaceChildren();
+    sh.pl.classList.toggle('is-hidden', t.prompt !== 'powerline');
+    if (sh.title) setText(sh.title, this.termTitle());
+    if (t.prompt !== 'powerline') return;
+    const group = el('span', 'mh-plseg');
+    group.appendChild(el('span', 'mh-seg mh-path', this.cwdLabel()));
+    if (this.s.pills.git && this.plugin.branch) group.appendChild(el('span', 'mh-seg mh-git', this.plugin.branch));
+    group.appendChild(el('span', 'mh-seg ' + (ok ? 'mh-ok' : 'mh-err'), ok ? '✓' : '✘'));
+    sh.pl.appendChild(group);
+    if (t.rprompt) {
+      const d = new Date();
+      sh.pl.appendChild(el('span', 'mh-rp', pad(d.getHours()) + ':' + pad(d.getMinutes())));
+    }
+  }
 
+  /* a grey suggestion from your history, fish-style. press → or End to take it. */
+  suggestion(v) {
+    if (!v) return '';
+    const h = this.plugin.history;
+    for (let i = h.length - 1; i >= 0; i--) {
+      if (h[i].length > v.length && h[i].startsWith(v)) return h[i].slice(v.length);
+    }
+    return '';
+  }
+
+  fill_shell(body) {
+    const t = this.s.terminal;
+    body.replaceChildren();
+    const win = el('div', 'mh-term mh-term-' + t.style);
+    const refs = this.refs.shell;
+
+    if (t.style === 'window' && t.titleBar) {
+      const bar = el('div', 'mh-tbar');
+      const dots = el('span', 'mh-tdots');
+      ['mh-bg0', 'mh-bg2', 'mh-bg3'].forEach((c, i) => {
+        const d = el('i', 'mh-tdot ' + c);
+        if (i === 0) { d.title = 'clear'; d.addEventListener('click', () => this.exec('clear')); }
+        dots.appendChild(d);
+      });
+      bar.appendChild(dots);
+      refs.title = el('span', 'mh-ttitle');
+      bar.appendChild(refs.title);
+      bar.appendChild(el('span', 'mh-tcorner', 'zsh'));
+      win.appendChild(bar);
+    }
+
+    const out = el('div', 'mh-tout');
+    const menu = el('div', 'mh-menu');
+    const prompt = el('div', 'mh-tprompt');
+    const pl = el('div', 'mh-pl');
     const line = el('div', 'mh-line');
-    line.appendChild(el('span', 'mh-chev', '❯'));
+    const chev = el('span', 'mh-chev', '❯');
+    line.appendChild(chev);
+
     const input = el('input', 'mh-input');
     input.type = 'text';
-    input.placeholder = this.s.shell.placeholder;
+    input.placeholder = t.placeholder;
     input.spellcheck = false;
     input.setAttribute('autocomplete', 'off');
     input.setAttribute('autocapitalize', 'off');
 
-    /* the text is drawn twice: the input's own copy is transparent, a coloured copy sits behind it,
-       and the caret is a hand-drawn block (same trick as mish.eza) */
+    /* the text is drawn twice: the input's own copy is transparent, a coloured copy sits behind it
+       (with the grey suggestion after it), and the caret is a hand-drawn block, like mish.eza */
     const wrap = el('div', 'mh-inwrap');
     const hl = el('div', 'mh-hl');
+    const row = el('span', 'mh-hl-row');
     const hlIn = el('span', 'mh-hl-in');
+    const ghost = el('span', 'mh-ghost');
     const meas = el('span', 'mh-hl-meas');
     const caret = el('div', 'mh-caret');
-    hl.appendChild(hlIn);
+    row.appendChild(hlIn);
+    row.appendChild(ghost);
+    hl.appendChild(row);
     hl.appendChild(meas);
     hl.appendChild(caret);
     wrap.appendChild(hl);
     wrap.appendChild(input);
     line.appendChild(wrap);
-    body.appendChild(line);
+
+    win.appendChild(out);
+    win.appendChild(menu);
+    prompt.appendChild(pl);
+    prompt.appendChild(line);
+    win.appendChild(prompt);
+    body.appendChild(win);
+
+    Object.assign(refs, { out, menu, pl, chev, input, ghost });
 
     const paint = () => {
       try { this.paintLine(hlIn, input.value); } catch (e) { hlIn.textContent = input.value; }
-      hlIn.style.transform = 'translateX(' + (-input.scrollLeft) + 'px)';
       const v = input.value;
       const pos = input.selectionStart == null ? v.length : input.selectionStart;
+      const atEnd = pos === v.length && input.selectionEnd === v.length;
+      const focused = input.ownerDocument.activeElement === input;
+      ghost.textContent = this.s.terminal.suggest && atEnd && focused ? this.suggestion(v) : '';
+      row.style.transform = 'translateX(' + (-input.scrollLeft) + 'px)';
       meas.textContent = v.slice(0, pos);
       const x = meas.getBoundingClientRect().width - input.scrollLeft;
       caret.style.transform = 'translate(' + x + 'px, -50%)';
@@ -1992,7 +2718,7 @@ class HomeView extends ItemView {
       caret.style.animation = '';
       wrap.classList.toggle('is-empty', !v);
       wrap.classList.toggle('has-sel', input.selectionStart !== input.selectionEnd);
-      wrap.classList.toggle('is-focus', input.ownerDocument.activeElement === input);
+      wrap.classList.toggle('is-focus', focused);
     };
     const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
     Object.defineProperty(input, 'value', {
@@ -2001,22 +2727,32 @@ class HomeView extends ItemView {
       set(v) { desc.set.call(this, v); paint(); },
     });
     ['input', 'scroll', 'keyup', 'mouseup', 'focus', 'blur', 'select'].forEach((ev) => input.addEventListener(ev, paint));
-    input.addEventListener('keydown', () => requestAnimationFrame(paint));
+    input.addEventListener('input', () => { this.compl = null; this.showMenu([], -1); });
     paint();
 
-    /* enter runs, tab completes, up/down walk the history, escape clears */
+    /* enter runs. tab completes (again to cycle). → takes the suggestion. up / down walk the history.
+       ctrl-l clears, ctrl-c drops the line, ctrl-u clears the line, esc leaves. */
     let at = -1;
     const hist = this.plugin.history;
     input.addEventListener('keydown', (e) => {
+      requestAnimationFrame(paint);
       if (e.key === 'Enter') {
         e.preventDefault();
         const value = input.value;
         input.value = '';
         at = -1;
+        this.compl = null;
+        this.showMenu([], -1);
         this.exec(value);
       } else if (e.key === 'Tab') {
         e.preventDefault();
-        this.complete(input);
+        this.complete(input, e.shiftKey);
+      } else if (e.key === 'ArrowRight' || e.key === 'End') {
+        const v = input.value;
+        if (input.selectionStart === v.length && input.selectionEnd === v.length) {
+          const s = this.suggestion(v);
+          if (s) { e.preventDefault(); input.value = v + s; }
+        }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (!hist.length) return;
@@ -2026,210 +2762,614 @@ class HomeView extends ItemView {
         e.preventDefault();
         at = Math.max(at - 1, -1);
         input.value = at < 0 ? '' : hist[hist.length - 1 - at];
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        this.exec('clear');
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        const v = input.value;
+        input.value = '';
+        if (v) { this.plugin.scrollback.push({ cmd: v + '^C', lines: [], ok: true }); this.renderScrollback(); }
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'u') {
+        e.preventDefault();
+        input.value = '';
       } else if (e.key === 'Escape') {
         input.value = '';
         at = -1;
-        this.say('');
+        this.compl = null;
+        this.showMenu([], -1);
         input.blur();
       }
     });
     line.addEventListener('mousedown', (e) => {
       if (e.target !== input) { e.preventDefault(); input.focus(); }
     });
+    prompt.addEventListener('mousedown', (e) => {
+      if (e.target === prompt || e.target === pl) { e.preventDefault(); input.focus(); }
+    });
 
-    this.refs.shell.out = out;
-    this.refs.shell.input = input;
+    this.renderScrollback();
+    this.updatePrompt();
   }
 
-  complete(input) {
+  /* ── completion ────────────────────────────────────────────────────────── */
+
+  noteNames() {
+    return Array.from(new Set(this.app.vault.getMarkdownFiles().map((f) => f.basename))).sort((a, b) => a.localeCompare(b));
+  }
+
+  childFolders(path) {
+    const folder = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : this.app.vault.getRoot();
+    if (!(folder instanceof TFolder)) return [];
+    return folder.children.filter((c) => c instanceof TFolder && c.name[0] !== '.').map((c) => c.name).sort((a, b) => a.localeCompare(b));
+  }
+
+  /* what could the word under the cursor become: { start, end, items: [{ label, insert, space }] } */
+  candidates(input) {
     const v = input.value;
     const pos = input.selectionStart == null ? v.length : input.selectionStart;
     const before = v.slice(0, pos);
-    const after = v.slice(pos);
-
     const first = before.match(/^(\s*)(\S*)$/);
     if (first) {
       const word = first[2].toLowerCase();
-      const names = Object.keys(this.cmds).filter((n) => n.startsWith(word));
-      if (!names.length) return;
-      if (names.length === 1) input.value = first[1] + names[0] + ' ' + after;
-      else { input.value = first[1] + commonPrefix(names) + after; this.say(names.join('  ')); }
+      const names = Object.keys(this.cmds).filter((n) => !this.cmds[n].hidden && n.startsWith(word)).sort();
+      return { start: first[1].length, end: pos, items: names.map((n) => ({ label: n, insert: n, space: true })) };
+    }
+    const m = before.match(/^(\s*)(\S+)\s+(.*)$/);
+    if (!m) return null;
+    const cmd = m[2].toLowerCase();
+    const typed = m[3];
+    const start = before.length - typed.length;
+    const bare = typed.replace(/^["']/, '');
+    const low = bare.toLowerCase();
+    const quote = (n) => (/\s/.test(n) ? '"' + n + '"' : n);
+    let items = [];
+    if (NOTE_CMDS.has(cmd)) {
+      const names = this.noteNames();
+      let hit = names.filter((n) => n.toLowerCase().startsWith(low));
+      if (!hit.length && low) hit = names.filter((n) => n.toLowerCase().includes(low));
+      items = hit.map((n) => ({ label: n, insert: quote(n), space: true }));
+    } else if (DIR_CMDS.has(cmd)) {
+      const slash = bare.lastIndexOf('/');
+      const dirPart = slash >= 0 ? bare.slice(0, slash + 1) : '';
+      const namePart = slash >= 0 ? bare.slice(slash + 1) : bare;
+      let base = this.plugin.cwd;
+      try { base = this.resolveDir(dirPart || '.'); } catch (e) { return null; }
+      const kids = this.childFolders(base).filter((n) => n.toLowerCase().startsWith(namePart.toLowerCase()));
+      if (!dirPart && '..'.startsWith(namePart)) kids.unshift('..');
+      items = kids.map((n) => ({ label: n + '/', insert: dirPart + n + '/', space: false }));
+    } else {
+      const lists = {
+        palette: ['mish'].concat(Object.keys(PALETTES)),
+        focus: ['start', 'pause', 'reset', 'skip', 'status'],
+        timer: ['start', 'pause', 'reset', 'skip', 'status'],
+        git: ['log', 'branch'],
+        help: Object.keys(this.cmds).filter((n) => !this.cmds[n].hidden).sort(),
+        man: Object.keys(this.cmds).filter((n) => !this.cmds[n].hidden).sort(),
+        go: parseShortcuts(this.s.links.items).map((x) => x.label.toLowerCase()),
+      };
+      if (lists[cmd]) items = lists[cmd].filter((n) => n.startsWith(low)).map((n) => ({ label: n, insert: n, space: true }));
+    }
+    return { start, end: pos, items };
+  }
+
+  showMenu(items, sel) {
+    const sh = this.refs.shell;
+    if (!sh || !sh.menu) return;
+    sh.menu.replaceChildren();
+    sh.menu.classList.toggle('is-open', items.length > 1);
+    if (items.length < 2) return;
+    items.slice(0, 14).forEach((it, i) => sh.menu.appendChild(el('span', 'mh-chip' + (i === sel ? ' is-sel' : ''), it.label)));
+    if (items.length > 14) sh.menu.appendChild(el('span', 'mh-chip is-more', '+' + (items.length - 14)));
+  }
+
+  /* tab: finish the word. several choices: fill what they share and show a menu, then tab cycles. */
+  complete(input, back) {
+    const st = this.compl;
+    if (st && input.value === st.last) {
+      st.i = (st.i + (back ? -1 : 1) + st.items.length) % st.items.length;
+      const it = st.items[st.i];
+      const next = st.before + it.insert + st.after;
+      st.last = next;
+      input.value = next;
+      const caretAt = (st.before + it.insert).length;
+      input.setSelectionRange(caretAt, caretAt);
+      this.showMenu(st.items, st.i);
       return;
     }
-
-    const m = before.match(/^(\s*)(\S+)\s+(.*)$/);
-    if (!m || !NOTE_CMDS.has(m[2].toLowerCase())) return;
-    const q = m[3].replace(/^["']/, '').toLowerCase();
-    const names = Array.from(new Set(this.app.vault.getMarkdownFiles().map((f) => f.basename)))
-      .filter((n) => n.toLowerCase().startsWith(q))
-      .sort((a, b) => a.localeCompare(b));
-    if (!names.length) return;
-    const wrapName = (n) => (/\s/.test(n) ? '"' + n : n);
-    if (names.length === 1) {
-      input.value = m[1] + m[2] + ' ' + (/\s/.test(names[0]) ? '"' + names[0] + '"' : names[0]);
-    } else {
-      const cp = commonPrefix(names);
-      input.value = m[1] + m[2] + ' ' + wrapName(cp.length >= q.length ? cp : q);
-      this.say(names.slice(0, 12).join('\n') + (names.length > 12 ? '\n… +' + (names.length - 12) : ''));
+    const c = this.candidates(input);
+    if (!c || !c.items.length) return;
+    const v = input.value;
+    const before = v.slice(0, c.start);
+    const tail = v.slice(c.end);
+    if (c.items.length === 1) {
+      const it = c.items[0];
+      input.value = before + it.insert + (it.space ? ' ' : '') + tail;
+      const caretAt = (before + it.insert + (it.space ? ' ' : '')).length;
+      input.setSelectionRange(caretAt, caretAt);
+      this.showMenu([], -1);
+      return;
     }
+    const typed = v.slice(c.start, c.end);
+    const cp = commonPrefix(c.items.map((x) => x.insert));
+    let now = v;
+    if (cp.length > typed.length) {
+      now = before + cp + tail;
+      input.value = now;
+      input.setSelectionRange((before + cp).length, (before + cp).length);
+    }
+    this.compl = { items: c.items, i: -1, before, after: tail, last: now };
+    this.showMenu(c.items, -1);
   }
+
+  /* ── running things ────────────────────────────────────────────────────── */
 
   async exec(line) {
     const raw = line.trim();
     if (!raw) return;
-    const hist = this.plugin.history;
-    if (hist[hist.length - 1] !== raw) hist.push(raw);
-    this.plugin.persist();
+    const p = this.plugin;
+    if (p.history[p.history.length - 1] !== raw) p.history.push(raw);
+    p.persist();
 
     const tokens = tokenise(raw);
     const name = tokens[0].toLowerCase();
-    const cmd = this.cmds[name];
-    if (!cmd) { this.say('zsh: command not found: ' + tokens[0], 'bad'); return; }
+    const entry = { cmd: raw, lines: [], ok: true };
+    let cleared = false;
     try {
-      await cmd.run(tokens.slice(1), raw.slice(raw.indexOf(tokens[0]) + tokens[0].length).trim());
+      const cmd = this.cmds[name];
+      if (!cmd) throw new CmdError('zsh: command not found: ' + tokens[0]);
+      const out = await cmd.run(tokens.slice(1), raw.slice(raw.indexOf(tokens[0]) + tokens[0].length).trim());
+      if (out === CLEAR) cleared = true;
+      else entry.lines = toLines(out);
     } catch (e) {
-      console.error(e);
-      this.say(name + ': ' + ((e && e.message) || 'failed'), 'bad');
+      entry.ok = false;
+      if (e instanceof CmdError) entry.lines = e.lines || [[T(e.message, 't0')]];
+      else {
+        console.error(e);
+        entry.lines = [[T(name + ': ' + ((e && e.message) || 'failed'), 't0')]];
+      }
     }
+    if (cleared) {
+      p.scrollback.length = 0;
+      p.lastOk = true;
+    } else {
+      entry.lines = entry.lines.slice(0, 300);
+      p.scrollback.push(entry);
+      if (p.scrollback.length > 60) p.scrollback.shift();
+      p.lastOk = entry.ok;
+    }
+    const sh = this.refs.shell;                   /* a command like reload may have rebuilt the page */
+    if (sh && sh.out) {
+      if (cleared) this.renderScrollback();
+      else {
+        const w = sh.out.querySelector('.is-welcome');
+        if (w) w.remove();
+        sh.out.appendChild(this.entryEl(entry));
+        while (sh.out.childNodes.length > 60) sh.out.removeChild(sh.out.firstChild);
+        sh.out.scrollTop = sh.out.scrollHeight;
+      }
+    }
+    this.updatePrompt();
   }
 
-  /* a note by name: opens it when there is one clear match, lists them when there are several */
-  async openByName(query) {
-    if (!query) { this.say('open: which note?', 'bad'); return; }
-    const hits = this.plugin.findNotes(query);
-    if (!hits.length) { this.say('open: no note called ' + query, 'bad'); return; }
-    if (hits.length > 1 && hits[0].basename.toLowerCase() !== query.toLowerCase()) {
-      this.say(hits.slice(0, 8).map((f) => f.path).concat(hits.length > 8 ? ['… +' + (hits.length - 8)] : []).concat(['(be more specific)']));
-      return;
+  /* a folder, resolved against the terminal's current folder. throws if it is not there. */
+  resolveDir(arg, emptyIsCwd) {
+    let a = String(arg || '').trim().replace(/^["']|["']$/g, '');
+    let base = this.plugin.cwd;
+    if (!a) return emptyIsCwd ? base : '';      /* cd alone goes home; ls and tree alone mean here */
+    if (a === '~') return '';
+    if (a[0] === '/') { base = ''; a = a.slice(1); } else if (a.indexOf('~/') === 0) { base = ''; a = a.slice(2); }
+    const parts = base ? base.split('/') : [];
+    for (const seg of a.split('/')) {
+      if (!seg || seg === '.') continue;
+      if (seg === '..') parts.pop(); else parts.push(seg);
     }
-    this.say('');
-    await this.plugin.openFile(hits[0]);
+    const path = parts.join('/');
+    if (path && !(this.app.vault.getAbstractFileByPath(normalizePath(path)) instanceof TFolder)) throw new CmdError('no such folder: ' + String(arg).trim());
+    return path;
   }
+
+  /* one note for a typed name. if several match, the error lists them (clickable). */
+  oneNote(query) {
+    if (!query) throw new CmdError('which note?');
+    const hits = this.plugin.findNotes(query);
+    if (!hits.length) throw new CmdError('no note called ' + query);
+    if (hits.length > 1 && hits[0].basename.toLowerCase() !== String(query).toLowerCase()) {
+      throw new CmdError('several notes match', hits.slice(0, 10).map((f) => [LINK(f.path, f, 't3')]).concat([[T('be more specific', 'dim')]]));
+    }
+    return hits[0];
+  }
+
+  fileName(f) { return f.extension === 'md' ? f.basename : f.name; }
 
   defineCommands() {
     const plugin = this.plugin;
     const cmds = {};
-    const def = (names, desc, run, hidden) => {
-      [].concat(names).forEach((n, i) => { cmds[n] = { desc, run, alias: hidden || i > 0, usage: [].concat(names)[0] }; });
+    const def = (names, usage, desc, group, run, hidden) => {
+      const list = [].concat(names);
+      list.forEach((n, i) => { cmds[n] = { usage, desc, group, run, hidden: Boolean(hidden), alias: i > 0, primary: list[0] }; });
     };
+    const exclude = () => parseList(this.s.exclude);
+    const sortKids = (a, b) => {
+      const fa = a instanceof TFolder;
+      const fb = b instanceof TFolder;
+      return fa === fb ? a.name.localeCompare(b.name) : fa ? -1 : 1;
+    };
+    const kidSeg = (k) => (k instanceof TFolder
+      ? RUN(k.name + '/', 'cd "' + k.path + '"', 't4')
+      : LINK(this.fileName(k), k, 't' + kindColour(k)));
+    const bar = (frac, n, mode) => {
+      const f = Math.max(0, Math.min(1, frac));
+      const on = Math.round(f * n);
+      const lvl = mode === 'low' ? (f < 0.2 ? 'bg0' : f < 0.4 ? 'bg2' : 'bg3') : (f > 0.85 ? 'bg0' : f > 0.6 ? 'bg2' : 'bg3');
+      return [T(' '.repeat(on), lvl), T(' '.repeat(n - on), 'bgdim')];
+    };
+    const statusLine = () => {
+      const st = plugin.focus;
+      const secs = Math.ceil(plugin.focusLeft() / 1000);
+      return [[T(st.mode === 'focus' ? 'focus' : st.mode === 'long' ? 'long break' : 'break', st.mode === 'focus' ? 't0' : 't3'),
+        '  ' + pad(Math.floor(secs / 60)) + ':' + pad(secs % 60) + '  ', T(st.running ? 'running' : 'paused', 'dim'),
+        T('  ·  ' + plugin.focusToday() + ' done today', 'dim')]];
+    };
+    const syncFocus = () => { for (const v of plugin.views) v.updateFocus(); };
 
-    def('help', 'this list', () => {
-      const seen = new Set();
-      const rows = [];
-      for (const key of Object.keys(cmds)) {
-        const c = cmds[key];
-        if (c.alias || seen.has(c.usage)) continue;
-        seen.add(c.usage);
-        rows.push(key.padEnd(10) + c.desc);
+    /* ── go ── */
+    def('help', 'help [command]', 'list the commands, or explain one', 'look', (args) => {
+      if (args[0]) {
+        const c = cmds[args[0].toLowerCase()];
+        if (!c) throw new CmdError('help: no such command: ' + args[0]);
+        return [[T(c.usage, 't3'), T('   ' + c.desc, 'dim')]];
       }
-      this.say(rows.concat(['', 'tab completes. up / down walk the history. esc clears.']));
+      const names = { go: 'go', read: 'read', write: 'write', time: 'time', info: 'info', look: 'look', fun: 'fun' };
+      const rows = [];
+      for (const g of Object.keys(names)) {
+        const members = Object.keys(cmds).filter((k) => !cmds[k].alias && !cmds[k].hidden && cmds[k].group === g);
+        const segs = [T(names[g].padEnd(7), 'dim')];
+        members.forEach((k, i) => { if (i) segs.push('  '); segs.push(RUN(k, 'help ' + k, 't3')); });
+        rows.push(segs);
+      }
+      rows.push([T('click a command for its usage · tab completes · ↑ ↓ history · ctrl-l clears', 'dim')]);
+      return rows;
     });
+    def('man', 'man <command>', 'same as help', 'look', (args) => cmds.help.run(args), true);
 
-    def(['open', 'cat', 'edit', 'vim', 'less'], 'open a note by name: open "my note"', (args) => this.openByName(args.join(' ')));
-
-    def(['new', 'touch'], 'make a note and open it: new [name]', async (args) => {
-      const f = await plugin.createNote(args.join(' '));
-      this.say('created ' + f.path);
+    def(['open', 'cat', 'edit', 'vim', 'less'], 'open <note | url>', 'open a note by name, or a web address', 'go', async (args, rest) => {
+      if (/^https?:\/\//i.test(rest)) { plugin.openUrl(rest); return [[T('opening ', 'dim'), GO(rest, rest, 't3')]]; }
+      const f = this.oneNote(args.join(' '));
+      await plugin.openFile(f);
+      return [[T('opened ', 'dim'), LINK(f.path, f, 't3')]];
     });
+    cmds.cat = { usage: 'cat <note>', desc: 'print a note here', group: 'read', alias: false, primary: 'cat', hidden: false, run: async (args) => {
+      const f = this.oneNote(args.join(' '));
+      const text = await this.app.vault.cachedRead(f);
+      const all = text.split(/\r?\n/);
+      const out = [[LINK(f.path, f, 't1')]];
+      let fm = all[0] === '---';
+      let i = 0;
+      for (; i < all.length && out.length < 40; i++) {
+        const l = all[i];
+        if (fm) { out.push([T(l, 'dim')]); if (i > 0 && l === '---') fm = false; continue; }
+        if (/^#+\s/.test(l)) out.push([T(l, 't0')]);
+        else if (/^\s*[-*+]\s+\[ \]/.test(l)) out.push([T(l, 't3')]);
+        else out.push(l);
+      }
+      if (i < all.length) out.push([T('… ' + (all.length - i) + ' more lines. ', 'dim'), RUN('open ' + (f.basename.includes(' ') ? '"' + f.basename + '"' : f.basename), 'open "' + f.basename + '"', 't3')]);
+      return out;
+    } };
 
-    def('daily', "open today's daily note", async () => { const f = await plugin.openDaily(); this.say('opened ' + f.path); });
-
-    def('random', 'open a random note', async () => { const f = await plugin.openRandom(); if (f) this.say('opened ' + f.path); });
-
-    def(['find', 'search', 'grep'], 'search the vault: find <text>', (args) => {
-      const q = args.join(' ');
-      if (!q) { this.say('find: what are we looking for?', 'bad'); return; }
-      const gs = this.app.internalPlugins && this.app.internalPlugins.getPluginById && this.app.internalPlugins.getPluginById('global-search');
-      if (gs && gs.instance && gs.instance.openGlobalSearch) gs.instance.openGlobalSearch(q);
-      else plugin.runCommand('global-search:open');
+    def('cd', 'cd [folder]', 'change the terminal folder (new, ls and tree use it)', 'go', (args) => {
+      plugin.cwd = this.resolveDir(args.join(' '));
+      this.updatePrompt();
+      return [];
     });
-
-    def(['recent', 'ls'], 'the notes you touched last: recent [n]', (args) => {
-      const n = num(args[0], 1, 30, 8);
-      const files = this.app.vault.getMarkdownFiles().sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, n);
-      this.say(files.map((f) => ageOf(f.stat.mtime).padStart(4) + '  ' + f.path));
+    def('pwd', 'pwd', 'where you are', 'go', () => [[this.cwdLabel()]]);
+    def(['ls', 'll'], 'ls [-l] [folder]', 'list a folder', 'go', (args) => {
+      const long = args.includes('-l');
+      const dir = this.resolveDir(args.filter((a) => a[0] !== '-').join(' '), true);
+      const folder = dir ? this.app.vault.getAbstractFileByPath(normalizePath(dir)) : this.app.vault.getRoot();
+      const kids = folder.children.filter((c) => c.name[0] !== '.').sort(sortKids);
+      if (!kids.length) return [[T('(empty)', 'dim')]];
+      if (long) {
+        return kids.slice(0, 40).map((k) => [T((k instanceof TFolder ? '-' : ageOf(k.stat.mtime)).padStart(4) + '  ', 'dim'),
+          T((k instanceof TFolder ? '' : fmtSize(k.stat.size)).padStart(8) + '  ', 'dim'), kidSeg(k)]);
+      }
+      const segs = [];
+      kids.slice(0, 80).forEach((k, i) => { if (i) segs.push('  '); segs.push(kidSeg(k)); });
+      if (kids.length > 80) segs.push(T('  … +' + (kids.length - 80), 'dim'));
+      return [segs];
     });
-
-    def('todo', 'open checkboxes', async () => {
-      const d = await plugin.collectTasks();
-      if (!d.total) { this.say('nothing to do. suspicious.'); return; }
-      this.say([d.total + ' open in ' + d.noteCount + ' notes'].concat(d.items.map((t) => '[ ] ' + t.text + '   (' + t.file.basename + ')')));
+    def('tree', 'tree [folder] [-L depth]', 'a folder as a tree', 'go', (args) => {
+      let depth = 2;
+      const rest = [];
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === '-L' && args[i + 1]) { depth = num(args[i + 1], 1, 4, 2); i++; } else rest.push(args[i]);
+      }
+      const dir = this.resolveDir(rest.join(' '), true);
+      const root = dir ? this.app.vault.getAbstractFileByPath(normalizePath(dir)) : this.app.vault.getRoot();
+      const out = [[T(dir || '.', 't4')]];
+      const walk = (folder, prefix, d) => {
+        const kids = folder.children.filter((c) => c.name[0] !== '.').sort(sortKids);
+        kids.forEach((k, i) => {
+          if (out.length >= 60) return;
+          const last = i === kids.length - 1;
+          out.push([T(prefix + (last ? '`-- ' : '|-- '), 'dim'), kidSeg(k)]);
+          if (k instanceof TFolder && d > 1) walk(k, prefix + (last ? '    ' : '|   '), d - 1);
+        });
+      };
+      walk(root, '', depth);
+      if (out.length >= 60) out.push([T('… (cut at 60 lines)', 'dim')]);
+      return out;
     });
-
-    def('streak', 'your current streak', () => {
-      const counts = plugin.dayCounts(this.s.streak.metric);
-      const has = (d) => (counts.get(dayKey(d.getTime())) || 0) > 0;
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      if (!has(d)) d.setDate(d.getDate() - 1);
-      let run = 0;
-      while (has(d) && run < 5000) { run++; d.setDate(d.getDate() - 1); }
-      this.say(run + ' day' + (run === 1 ? '' : 's') + ' in a row');
+    def('new', 'new [name]', 'make a note in this folder and open it', 'go', async (args) => {
+      const f = await plugin.createNote(args.join(' '), plugin.cwd);
+      return [[T('created ', 'dim'), LINK(f.path, f, 't3')]];
     });
-
-    def(['stats', 'fastfetch', 'neofetch'], 'vault stats', () => {
-      const st = plugin.vaultStats();
-      this.say([
-        'notes    ' + st.notes, 'links    ' + st.links, 'tags     ' + st.tags,
-        'folders  ' + st.folders, 'files    ' + st.files, 'size     ' + fmtSize(st.size),
-      ]);
+    def('daily', 'daily', "open today's daily note", 'go', async () => {
+      const f = await plugin.openDaily();
+      return [[T('opened ', 'dim'), LINK(f.path, f, 't3')]];
     });
-
-    def(['cmd', 'run'], 'run any obsidian command: cmd <name>', (args) => {
+    def('random', 'random', 'open a random note', 'go', async () => {
+      const f = await plugin.openRandom();
+      if (!f) throw new CmdError('no notes yet');
+      return [[T('opened ', 'dim'), LINK(f.path, f, 't3')]];
+    });
+    def('go', 'go [link]', 'open one of your links in the browser', 'go', (args) => {
+      const links = parseShortcuts(this.s.links.items);
+      if (!args.length) {
+        if (!links.length) throw new CmdError('no links. add some in settings.');
+        return links.map((l) => [T('❯ ', 't3'), GO(l.label, l.id, 'fg'), T('  ' + l.id, 'dim')]);
+      }
       const q = args.join(' ').toLowerCase();
-      if (!q) { plugin.runCommand('command-palette:open'); return; }
-      const all = Object.values(this.app.commands.commands);
-      const exact = all.filter((c) => c.id.toLowerCase() === q || c.name.toLowerCase() === q);
-      const hits = exact.length ? exact : all.filter((c) => c.name.toLowerCase().includes(q));
-      if (!hits.length) { this.say('cmd: nothing matches ' + q, 'bad'); return; }
-      if (hits.length > 1) { this.say(hits.slice(0, 8).map((c) => c.name).concat(['(be more specific)'])); return; }
-      this.say('running ' + hits[0].name);
-      plugin.runCommand(hits[0].id);
+      const hit = links.find((l) => l.label.toLowerCase() === q) || links.find((l) => l.label.toLowerCase().startsWith(q));
+      if (!hit) throw new CmdError('go: no link called ' + q);
+      plugin.openUrl(hit.id);
+      return [[T('opening ', 'dim'), GO(hit.label, hit.id, 't3')]];
     });
 
-    def('settings', 'open the settings for this plugin', () => {
-      this.app.setting.open();
-      this.app.setting.openTabById(PLUGIN_ID);
+    /* ── read & search ── */
+    def('recent', 'recent [n]', 'the notes you touched last', 'read', (args) => {
+      const n = num(args[0], 1, 30, 8);
+      const files = this.app.vault.getMarkdownFiles().filter((f) => !isExcluded(f.path, exclude())).sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, n);
+      return files.map((f) => [T(ageOf(f.stat.mtime).padStart(4) + '  ', 'dim'), LINK(f.path, f, 't3')]);
+    });
+    def('find', 'find <name>', 'find notes by name', 'read', (args) => {
+      const q = args.join(' ');
+      if (!q) throw new CmdError('find: what are we looking for?');
+      const hits = plugin.findNotes(q).slice(0, 12);
+      if (!hits.length) throw new CmdError('find: nothing called ' + q);
+      return hits.map((f) => [LINK(f.path, f, 't3')]);
+    });
+    def('grep', 'grep <text>', 'search inside your notes', 'read', async (args, rest) => {
+      const q = rest.toLowerCase();
+      if (!q) throw new CmdError('grep: what are we looking for?');
+      const files = this.app.vault.getMarkdownFiles().filter((f) => !isExcluded(f.path, exclude())).sort((a, b) => b.stat.mtime - a.stat.mtime);
+      const hits = [];
+      let scanned = 0;
+      for (const f of files) {
+        if (hits.length >= 14 || scanned >= 800) break;
+        scanned++;
+        let text;
+        try { text = await this.app.vault.cachedRead(f); } catch (e) { continue; }
+        if (!text.toLowerCase().includes(q)) continue;
+        const lines = text.split(/\r?\n/);
+        for (let i = 0; i < lines.length && hits.length < 14; i++) {
+          const at = lines[i].toLowerCase().indexOf(q);
+          if (at >= 0) hits.push({ f, i, line: lines[i].trim(), at });
+        }
+      }
+      if (!hits.length) throw new CmdError('grep: nothing matches ' + rest);
+      const out = hits.map((h) => {
+        const lineText = h.line;
+        const k = lineText.toLowerCase().indexOf(q);
+        const from = Math.max(0, k - 24);
+        const pre = (from > 0 ? '…' : '') + lineText.slice(from, k);
+        const post = lineText.slice(k + q.length, k + q.length + 40);
+        return [LINK(h.f.basename + ':' + (h.i + 1), h.f, 't1', h.i), T('  ' + pre, 'dim'), T(lineText.slice(k, k + q.length), 't0'), T(post, 'dim')];
+      });
+      if (hits.length >= 14) out.push([T('… showing the first 14. ', 'dim'), RUN('search ' + rest, 'search ' + rest, 't3'), T(' opens them all', 'dim')]);
+      return out;
+    });
+    def('search', 'search <text>', "open obsidian's search panel", 'read', (args) => {
+      if (!args.length) throw new CmdError('search: what are we looking for?');
+      this.openSearch(args.join(' '));
+      return [[T('searching for ' + args.join(' '), 'dim')]];
+    });
+    def('todo', 'todo [add <text>]', 'list open tasks, or add one', 'read', async (args, rest) => {
+      if (args[0] && args[0].toLowerCase() === 'add') {
+        const text = rest.replace(/^add\s*/i, '').trim();
+        if (!text) throw new CmdError('todo add: what needs doing?');
+        const f = await plugin.capture(text, 'task');
+        plugin.refreshSoon(['tasks'], 800);
+        return [[T('[ ] ', 't3'), text, T('  → ', 'dim'), LINK(f.path, f, 't3')]];
+      }
+      const d = await plugin.collectTasks();
+      if (!d.total) return [[T('nothing to do. suspicious.', 'dim')]];
+      return [[T(String(d.total), 't3'), T(' open in ' + d.noteCount + ' notes', 'dim')]].concat(
+        d.items.map((t) => [T('[ ] ', 't3'), LINK(t.text, t.file, 'fg', t.line), T('  ' + t.file.basename, 'dim')])
+      );
     });
 
-    def('palette', 'change the colours: palette <name>', (args) => {
-      const names = ['mish'].concat(Object.keys(PALETTES));
-      const want = (args[0] || '').toLowerCase();
-      if (!names.includes(want)) { this.say('palettes: ' + names.join(', ')); return; }
-      const p = this.s.palette;
-      if (want === 'mish') p.preset = 'theme';
-      else { p.preset = want; p.colours = PALETTES[want].slice(); }
-      plugin.restyleAll();
-      plugin.persist();
-      this.say('palette: ' + want);
+    /* ── write ── */
+    def(['add', 'note'], 'add <text>', 'jot a line into your daily note or inbox', 'write', async (args, rest) => {
+      if (!rest) throw new CmdError('add: add what?');
+      const f = await plugin.capture(rest, 'note');
+      return [[T('+ ', 't3'), rest, T('  → ', 'dim'), LINK(f.path, f, 't3')]];
     });
 
-    def('reload', 'redraw the page', () => plugin.rebuildAll());
-    def('clear', 'clear the output', () => this.say(''));
-    def('date', 'the date', () => {
+    /* ── time ── */
+    def('date', 'date', 'the date and time', 'time', () => {
       const d = new Date();
       let zone = '';
       try {
         const part = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' }).formatToParts(d).find((x) => x.type === 'timeZoneName');
         zone = part ? ' ' + part.value : '';
       } catch (e) { zone = ''; }
-      this.say(moment(d).format('ddd D MMM HH:mm:ss') + zone + ' ' + d.getFullYear());
+      return [[moment(d).format('ddd D MMM HH:mm:ss') + zone + ' ' + d.getFullYear()]];
     });
-    def('uptime', 'how long obsidian has been open', () => this.say('up ' + fmtUp(performance.now())));
-    def('whoami', 'you', () => this.say(this.userName()));
-    def('pwd', 'where you are', () => this.say(this.s.pathLabel || '~/' + this.app.vault.getName()));
-    def('echo', 'say something back', (args, rest) => this.say(rest));
-    def('fortune', 'a line from your list', () => {
-      const lines = String(this.s.quote.lines || '').split('\n').map((l) => l.trim()).filter(Boolean);
-      this.say(lines.length ? lines[Math.floor(Math.random() * lines.length)] : 'no lines. add some in settings.');
+    def('cal', 'cal [+n | -n]', 'a month calendar (days with notes are green)', 'time', (args) => {
+      const off = Number(args[0]) || 0;
+      const m = moment().startOf('month').add(off, 'months');
+      const startDow = this.s.weekStart === 'sun' ? 0 : 1;
+      const marks = plugin.dayCounts('edits');
+      const title = m.format('MMMM YYYY');
+      const out = [[T(' '.repeat(Math.max(0, Math.floor((20 - title.length) / 2))) + title, 't0')]];
+      out.push([T(Array.from({ length: 7 }, (x, i) => DAYS[(startDow + i) % 7].slice(0, 2)).join(' '), 'dim')]);
+      const offset = (m.day() - startDow + 7) % 7;
+      const start = m.clone().subtract(offset, 'days');
+      const weeks = Math.ceil((offset + m.daysInMonth()) / 7);
+      const today = moment().format('YYYY-MM-DD');
+      for (let w = 0; w < weeks; w++) {
+        const line = [];
+        for (let d = 0; d < 7; d++) {
+          const day = start.clone().add(w * 7 + d, 'days');
+          const key = day.format('YYYY-MM-DD');
+          const s = String(day.date()).padStart(2);
+          if (d) line.push(' ');
+          if (key === today) line.push(T(s, 'today'));
+          else if (day.month() !== m.month()) line.push(T(s, 'dim'));
+          else if (marks.get(key)) line.push(T(s, 't3'));
+          else line.push(s);
+        }
+        out.push(line);
+      }
+      return out;
     });
-    def('history', 'what you typed before', () => this.say(plugin.history.slice(-15).map((h, i, a) => String(plugin.history.length - a.length + i + 1).padStart(3) + '  ' + h)));
-    def(['exit', 'quit', 'q'], 'close this tab', () => this.leaf.detach());
+    def(['focus', 'timer', 'pomodoro'], 'focus [start|pause|reset|skip|<minutes>]', 'the pomodoro timer', 'time', (args) => {
+      const sub = (args[0] || 'status').toLowerCase();
+      if (/^\d+$/.test(sub)) {
+        /* a one-off length: your settings are left alone */
+        plugin.focusReset();
+        plugin.focus.custom = num(sub, 1, 180, 25) * 60000;
+        plugin.focus.left = plugin.focus.custom;
+        plugin.focusStart();
+      } else if (sub === 'start' || sub === 'resume') plugin.focusStart();
+      else if (sub === 'pause' || sub === 'stop') plugin.focusPause();
+      else if (sub === 'reset') plugin.focusReset();
+      else if (sub === 'skip') plugin.focusSkip();
+      else if (sub !== 'status') throw new CmdError('focus: try start, pause, reset, skip or a number of minutes');
+      syncFocus();
+      return statusLine();
+    });
+    def('uptime', 'uptime', 'how long obsidian and this computer have been up', 'time', () => {
+      const up = plugin.sysUptime();
+      return [['obsidian ' + fmtUp(performance.now()) + (up == null ? '' : '  ·  system ' + fmtUp(up))]];
+    });
 
-    /* things a real shell has that this one does not */
-    def('sudo', '', () => this.say(this.userName() + ' is not in the sudoers file. this incident will be reported.', 'bad'), true);
-    def('cd', '', () => this.say('cd: you live here now.'), true);
-    def('rm', '', () => this.say("rm: not from here. that's mish.eza's job.", 'bad'), true);
+    /* ── info ── */
+    def(['stats', 'fastfetch', 'neofetch'], 'stats', 'a summary of the vault', 'info', () => {
+      const st = plugin.vaultStats();
+      let path = this.app.vault.getName();
+      try { path = this.app.vault.adapter.getBasePath() || path; } catch (e) { /* not a desktop adapter */ }
+      const rows = [
+        ['user', this.userName() + '@' + plugin.detected.host], ['os', osName() + ' · obsidian ' + (obsidian.apiVersion || '')],
+        ['vault', path], ['notes', String(st.notes)], ['links', String(st.links)], ['tags', String(st.tags)],
+        ['folders', String(st.folders)], ['files', String(st.files)], ['size', fmtSize(st.size)], ['uptime', fmtUp(performance.now())],
+      ];
+      const out = rows.map(([k, v]) => [T(k.padEnd(9), 't0'), v]);
+      out.push([T('   ', 'bg0'), T('   ', 'bg1'), T('   ', 'bg2'), T('   ', 'bg3'), T('   ', 'bg4'), T('   ', 'bg5')]);
+      return out;
+    });
+    def(['top', 'sysinfo'], 'top', 'cpu, memory and battery', 'info', () => {
+      const out = [];
+      const c = plugin.cpuNow();
+      if (c != null) out.push([T('cpu   ', 't0')].concat(bar(c / 100, 20, 'high'), ' ' + c + '%'));
+      const m = plugin.memNow();
+      if (m) out.push([T('mem   ', 't0')].concat(bar(m.used / m.total, 20, 'high'), ' ' + (m.used / 1073741824).toFixed(1) + '/' + (m.total / 1073741824).toFixed(0) + 'g'));
+      if (plugin.battery) out.push([T('batt  ', 't0')].concat(bar(plugin.battery.level, 20, 'low'), ' ' + Math.round(plugin.battery.level * 100) + '%' + (plugin.battery.charging ? ' charging' : '')));
+      const up = plugin.sysUptime();
+      out.push([T('up    ', 't0'), (up == null ? '' : fmtUp(up) + ' · ') + 'obsidian ' + fmtUp(performance.now())]);
+      return out;
+    });
+    def('git', 'git [log | branch]', 'read the vault\'s git history', 'info', async (args) => {
+      const sub = (args[0] || 'log').toLowerCase();
+      if (sub === 'branch') {
+        if (!plugin.branch) throw new CmdError('fatal: not a git repository');
+        return [[T('* ', 't3'), plugin.branch]];
+      }
+      if (sub !== 'log') throw new CmdError('git: only log and branch are available here');
+      const list = await plugin.gitLog(num(args[1], 1, 30, 8));
+      if (list === null) throw new CmdError('fatal: not a git repository');
+      return list.length ? list.map((c) => [T(c.hash + ' ', 't2'), c.msg, T('  ' + ageOf(c.ts), 'dim')]) : [[T('no commits yet', 'dim')]];
+    });
+    def('tags', 'tags [n]', 'your most used tags', 'info', (args) => {
+      const list = plugin.topTags(num(args[0], 1, 30, 10));
+      if (!list.length) throw new CmdError('no tags yet');
+      return list.map(([tag, n], i) => [RUN(tag.padEnd(18), 'search tag:' + tag, 't' + (i % COLOURS)), String(n)]);
+    });
+    def('du', 'du [depth]', 'notes per folder', 'info', (args) => {
+      const list = plugin.folderStats(num(args[0], 1, 3, 1), 14);
+      if (!list.length) throw new CmdError('no notes yet');
+      return list.map(([name, n]) => [T(String(n).padStart(5) + '  ', 'dim'), name === '.' ? './' : RUN(name + '/', 'ls "' + name + '"', 't4')]);
+    });
+    def('whoami', 'whoami', 'you', 'info', () => [[this.userName()]]);
+    def('history', 'history', 'what you typed before', 'info', () => {
+      const h = plugin.history.slice(-15);
+      return h.map((x, i) => [T(String(plugin.history.length - h.length + i + 1).padStart(4) + '  ', 'dim'), RUN(x, x, 'fg')]);
+    });
+
+    /* ── look ── */
+    def('palette', 'palette <name>', 'change the colours', 'look', (args) => {
+      const names = ['mish'].concat(Object.keys(PALETTES));
+      const want = (args[0] || '').toLowerCase();
+      if (!names.includes(want)) return [[T('palettes  ', 'dim')].concat(names.reduce((a, n, i) => a.concat(i ? ['  '] : [], [RUN(n, 'palette ' + n, 't' + (i % COLOURS))]), []))];
+      const p = this.s.palette;
+      if (want === 'mish') p.preset = 'theme';
+      else { p.preset = want; p.colours = PALETTES[want].slice(); }
+      plugin.restyleAll();
+      plugin.persist();
+      return [[T('palette: ' + want, 'dim')]];
+    });
+    def('banner', 'banner <text>', 'change the big letters', 'look', (args, rest) => {
+      if (!rest) throw new CmdError('banner: what should it say?');
+      const b = this.s.banner;
+      b.source = 'custom';
+      b.custom = rest;
+      plugin.persist();
+      for (const v of plugin.views) v.fill('banner');
+      return this.refs.banner ? [[T('banner: ' + rest, 'dim')]] : [[T('the banner section is switched off (settings > sections)', 'dim')]];
+    });
+    def('clear', 'clear', 'clear the terminal', 'look', () => CLEAR);
+    def('reload', 'reload', 'redraw the whole page', 'look', () => {
+      window.setTimeout(() => plugin.rebuildAll(), 0);
+      return [[T('redrawing…', 'dim')]];
+    });
+    def('settings', 'settings', 'open the settings for this plugin', 'look', () => {
+      this.app.setting.open();
+      this.app.setting.openTabById(PLUGIN_ID);
+      return [];
+    });
+    def(['exit', 'quit', 'q'], 'exit', 'close this tab', 'look', () => { this.leaf.detach(); return []; });
+
+    /* ── fun ── */
+    def('echo', 'echo <text>', 'say something back', 'fun', (args, rest) => [[rest]]);
+    def('fortune', 'fortune', 'a line from your list', 'fun', () => {
+      const lines = String(this.s.quote.lines || '').split('\n').map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) throw new CmdError('no lines. add some in settings.');
+      return [[T(lines[Math.floor(Math.random() * lines.length)], 't1')]];
+    });
+    def('cowsay', 'cowsay [text]', 'a cow says it', 'fun', (args, rest) => {
+      const lines = String(this.s.quote.lines || '').split('\n').map((l) => l.trim()).filter(Boolean);
+      const text = rest || (lines.length ? lines[Math.floor(Math.random() * lines.length)] : 'moo');
+      const words = text.split(/\s+/);
+      const rows = [];
+      let cur = '';
+      for (const w of words) {
+        if ((cur + ' ' + w).trim().length > 34) { rows.push(cur); cur = w; } else cur = (cur + ' ' + w).trim();
+      }
+      if (cur) rows.push(cur);
+      const w = Math.max(...rows.map((r) => r.length));
+      const out = [[T(' ' + '_'.repeat(w + 2), 'dim')]];
+      rows.forEach((r, i) => {
+        const [l, rr] = rows.length === 1 ? ['<', '>'] : i === 0 ? ['/', '\\'] : i === rows.length - 1 ? ['\\', '/'] : ['|', '|'];
+        out.push([T(l + ' ', 'dim'), T(r.padEnd(w), 't1'), T(' ' + rr, 'dim')]);
+      });
+      out.push([T(' ' + '-'.repeat(w + 2), 'dim')]);
+      ['        \\   ^__^', '         \\  (oo)\\_______', '            (__)\\       )\\/\\', '                ||----w |', '                ||     ||']
+        .forEach((l) => out.push([T(l, 't0')]));
+      return out;
+    });
+    def('sudo', 'sudo', '', 'fun', () => { throw new CmdError(this.userName() + ' is not in the sudoers file. this incident will be reported.'); }, true);
+    def('rm', 'rm', '', 'fun', () => { throw new CmdError("rm: not from here. that's mish.eza's job."); }, true);
     return cmds;
   }
 }
@@ -2272,7 +3412,8 @@ class HomeSettingTab extends PluginSettingTab {
     /* kind: 'look' = styles only, 'bar' = redraw the prompt, 'data' = redraw the sections,
        'build' = rebuild the whole page */
     const apply = (kind) => {
-      if (kind === 'build') plugin.rebuildAll();
+      if (kind === 'focus') { plugin.focusSync(); for (const v of plugin.views) v.updateFocus(); }
+      else if (kind === 'build') plugin.rebuildAll();
       else if (kind === 'bar') { plugin.probe(); }
       else if (kind === 'data') { plugin.restyleAll(); for (const v of plugin.views) v.refresh(null); }
       else plugin.restyleAll();
@@ -2368,6 +3509,8 @@ class HomeSettingTab extends PluginSettingTab {
       .addButton((b) => b.setButtonText(ui('open')).setCta().onClick(() => plugin.openHome()));
 
     /* ── opening ── */
+    const on = (id) => Boolean((s.sections.find((x) => x.id === id) || {}).on);
+
     head('opening');
     drop('startup', 'open on startup', 'always opens the home tab (or jumps to it) every time obsidian starts. only when nothing is open does it when the workspace is empty. never leaves it to you.',
       { always: 'always', empty: 'only when nothing is open', never: 'never' }, 'look');
@@ -2408,7 +3551,7 @@ class HomeSettingTab extends PluginSettingTab {
       new UiSetting(containerEl)
         .setName(meta.label)
         .setDesc(meta.desc)
-        .addToggle((t) => t.setValue(it.on).onChange((v) => { it.on = v; apply('build'); }))
+        .addToggle((t) => t.setValue(it.on).onChange((v) => { it.on = v; apply('build'); this.redraw(); }))
         .addExtraButton((b) => b
           .setIcon(it.wide ? 'rectangle-horizontal' : 'square')
           .setTooltip(ui(it.wide ? 'full width in the two-column layout' : 'half width in the two-column layout'))
@@ -2435,8 +3578,9 @@ class HomeSettingTab extends PluginSettingTab {
     tog('clock.seconds', 'show seconds', 'the clock pill already ticks every second.', 'build');
 
     /* ── banner ── */
+    if (on('banner')) {
     head('banner');
-    drop('banner.source', 'text', 'what the big letters say.', { vault: 'the vault name', name: 'your name', custom: 'custom text' }, 'data');
+    drop('banner.source', 'text', 'what the big letters say.', { vault: 'the vault name', name: 'your name', time: 'the time (updates every minute)', custom: 'custom text' }, 'data');
     text('banner.custom', 'custom text', 'used when text is set to custom. letters, numbers, spaces and . - _ / are drawn; anything else is skipped.', 'welcome home', 'data');
     drop('banner.letters', 'letters', 'lowercase is a full lowercase block face with ascenders and descenders (mish.shell). capitals are the chunkier five-row letters.', { lower: 'lowercase', caps: 'capitals' }, 'data');
     drop('banner.style', 'style', 'blocks are pixel letters drawn by the plugin. text is a big line in your font.', { blocks: 'blocks', text: 'big text' }, 'data');
@@ -2446,9 +3590,13 @@ class HomeSettingTab extends PluginSettingTab {
     drop('banner.align', 'position', '', { left: 'left', centre: 'centre' }, 'data');
 
     /* ── greeting ── */
+    }
+
+    if (on('greeting')) {
     head('greeting');
     text('greeting.template', 'greeting', 'you can use {greeting} (good morning / afternoon / evening, or still up when it is late), {name}, {vault}, {time} and {date}.', '{greeting}, {name}.', 'data');
     tog('greeting.showDate', 'show the date', '', 'data');
+    tog('greeting.summary', 'summary line', 'notes, links and your current streak, in one line.', 'data');
     text('greeting.dateFormat', 'date format', 'moment.js tokens: dddd is the weekday, D the day, MMMM the month, YYYY the year. a middle dot is nice between them.', 'dddd · D MMMM YYYY', 'data');
     tog('greeting.progress.day', 'day progress bar', 'how far through the day you are.', 'data');
     tog('greeting.progress.week', 'week progress bar', '', 'data');
@@ -2458,6 +3606,9 @@ class HomeSettingTab extends PluginSettingTab {
     slide('greeting.barHeight', 'bar thickness', '', 4, 14, 1, 'look', ' px');
 
     /* ── shortcuts ── */
+    }
+
+    if (on('shortcuts')) {
     head('shortcuts');
     const shortcuts = area('shortcuts.items', 'commands', 'one per line, as  label | command id. lines starting with # are skipped. a dimmed shortcut means the command id does not exist. pick commands with the button below, so you never have to look up an id.', 7, 'data');
     new UiSetting(containerEl)
@@ -2477,12 +3628,17 @@ class HomeSettingTab extends PluginSettingTab {
     tog('shortcuts.hotkeys', 'show hotkeys', 'the little ⌘ n badge, when the command has a hotkey.', 'data');
 
     /* ── fastfetch ── */
-    head('fastfetch');
-    new UiSetting(containerEl).setDesc('this section is off by default. your sidebar already has mish.fastfetch. switch it on under sections.');
-    for (const key of Object.keys(FETCH_FIELDS)) tog('fetch.fields.' + key, FETCH_FIELDS[key], '', 'data');
-    tog('fetch.colourBar', 'colour bar', 'the row of colour blocks at the bottom.', 'data');
+    }
 
-    /* ── recent ── */
+    if (on('calendar')) {
+    head('calendar');
+    drop('calendar.mark', 'mark days with', 'edits marks the days you edited notes (the same count as the streak). daily notes marks days that have a daily note.',
+      { activity: 'edits', daily: 'daily notes', none: 'nothing' }, 'data');
+    tog('calendar.weekNumbers', 'week numbers', '', 'data');
+    tog('calendar.arrows', 'month arrows', 'the ← → buttons for looking at other months. click the month name to come back.', 'data');
+    }
+
+    if (on('recent')) {
     head('recent');
     drop('recent.mode', 'sort by', 'opened = the notes you opened last. if fewer than the count, the list is filled with the newest edited. the page remembers what you open while the plugin is on.',
       { opened: 'last opened', edited: 'last edited', created: 'newest' }, 'data');
@@ -2496,6 +3652,9 @@ class HomeSettingTab extends PluginSettingTab {
     tog('recent.tree', 'tree lines', 'the ├── └── lines. off uses a ❯ in front of each name.', 'data');
 
     /* ── pinned ── */
+    }
+
+    if (on('pinned')) {
     head('pinned');
     area('pinned.paths', 'notes', 'one per line: a note name, a path, or a [[link]]. missing ones show dimmed.', 5, 'data');
     tog('pinned.bookmarks', 'include bookmarks', "adds the notes from obsidian's bookmarks core plugin, when it is on.", 'data');
@@ -2504,6 +3663,9 @@ class HomeSettingTab extends PluginSettingTab {
     tog('pinned.tree', 'tree lines', '', 'data');
 
     /* ── todo ── */
+    }
+
+    if (on('tasks')) {
     head('todo');
     slide('tasks.count', 'how many to show', 'the most recently edited notes come first.', 1, 30, 1, 'data', '');
     slide('tasks.scan', 'notes to read', 'at most this many notes are opened to read the task text. the count at the top always covers the whole vault.', 5, 400, 5, 'data', '');
@@ -2511,6 +3673,59 @@ class HomeSettingTab extends PluginSettingTab {
     tog('tasks.showNote', 'show the note name', '', 'data');
 
     /* ── streak ── */
+    }
+
+    if (on('focus')) {
+    head('focus timer');
+    slide('focus.focusMin', 'focus', 'minutes.', 5, 120, 5, 'focus', ' min');
+    slide('focus.breakMin', 'break', 'minutes.', 1, 30, 1, 'focus', ' min');
+    slide('focus.longBreakMin', 'long break', 'minutes. you get one after every few focus sessions.', 5, 60, 5, 'focus', ' min');
+    slide('focus.longEvery', 'long break every', 'focus sessions.', 2, 8, 1, 'focus', '');
+    tog('focus.autoNext', 'start the next one automatically', 'after a focus or break ends, the next starts on its own.', 'focus');
+    tog('focus.notify', 'notify when one ends', 'a message in the corner of obsidian.', 'focus');
+    }
+
+    if (on('system')) {
+    head('system');
+    tog('system.cpu', 'cpu', '', 'data');
+    tog('system.memory', 'memory', 'memory in use. macos counts cached memory as used, so this reads high.', 'data');
+    tog('system.battery', 'battery', 'only shown when the computer reports one.', 'data');
+    tog('system.uptime', 'uptime', 'how long this computer and obsidian have been up.', 'data');
+    tog('system.network', 'network', 'online or offline.', 'data');
+    slide('system.barWidth', 'bar length', 'cells in each bar.', 6, 30, 1, 'data', '');
+    }
+
+    if (on('links')) {
+    head('links');
+    area('links.items', 'links', 'one per line, as  label | address. they open in your browser. the terminal can open them too: go <label>.', 5, 'data');
+    drop('links.layout', 'layout', '', { list: 'list', row: 'row' }, 'data');
+    drop('links.colour', 'label colour', '', { plain: 'plain', rainbow: 'rainbow' }, 'data');
+    }
+
+    if (on('tags')) {
+    head('tags');
+    slide('tags.count', 'how many', 'the most used tags. click one to search for it.', 1, 20, 1, 'data', '');
+    }
+
+    if (on('folders')) {
+    head('folders');
+    slide('folders.count', 'how many', '', 1, 20, 1, 'data', '');
+    slide('folders.depth', 'depth', '1 counts top-level folders. 2 counts folder/subfolder.', 1, 3, 1, 'data', '');
+    }
+
+    if (on('random')) {
+    head('random note');
+    slide('random.lines', 'lines', 'how much of the note to show.', 2, 20, 1, 'data', '');
+    drop('random.mode', 'pick', 'one per day shows the same note all day. random picks a new one each time the page opens.', { daily: 'one per day', random: 'random' }, 'data');
+    slide('random.minChars', 'skip short notes', 'notes smaller than this many characters are never picked.', 0, 2000, 20, 'data', '');
+    }
+
+    if (on('git')) {
+    head('git log');
+    slide('git.count', 'commits', 'read from the vault\'s .git folder, when there is one.', 1, 20, 1, 'data', '');
+    }
+
+    if (on('streak')) {
     head('streak');
     drop('streak.metric', 'counts', 'edits = days you edited notes, kept from the day this plugin first ran and filled in from file dates before that. last modified and created use file dates only (a synced vault can show everything on one day). journal entries counts notes named like your daily notes, longer ones darker.',
       { edits: 'edits', modified: 'last modified', created: 'created', daily: 'journal entries' }, 'data');
@@ -2523,6 +3738,34 @@ class HomeSettingTab extends PluginSettingTab {
     tog('streak.dayLabels', 'day labels', 'mon, wed, fri down the side.', 'data');
     tog('streak.monthLabels', 'month labels', '', 'data');
     tog('streak.summary', 'summary line', 'current streak, best streak and the total.', 'data');
+    }
+
+    if (on('quote')) {
+    head('fortune');
+    drop('quote.mode', 'pick', 'daily shows the same line all day. random picks a new one each time the page opens.', { daily: 'one per day', random: 'random' }, 'data');
+    area('quote.lines', 'lines', 'one per line.', 6, 'data');
+
+    /* ── shell ── */
+    }
+
+    if (on('shell')) {
+    head('terminal');
+    drop('terminal.style', 'look', 'window is a terminal window with a title bar and its own background. plain is just the text.', { window: 'window', plain: 'plain' }, 'build');
+    tog('terminal.titleBar', 'title bar', 'the three dots and the title above the window. the first dot clears it.', 'build');
+    text('terminal.title', 'title', 'you can use {user}, {host}, {path} and {vault}.', '{user}@{host}: {path}', 'build');
+    slide('terminal.height', 'scrollback height', 'lines of output shown above the prompt.', 2, 20, 1, 'look', '');
+    drop('terminal.prompt', 'prompt', 'powerline adds a line of pills above the prompt: the folder you are in, the git branch, and whether the last command worked.',
+      { powerline: 'powerline', compact: 'compact' }, 'build');
+    tog('terminal.rprompt', 'time on the right', 'the time at the right end of the powerline.', 'build');
+    tog('terminal.suggest', 'autosuggestions', 'grey suggestions from your history as you type. press → to take one.', 'look');
+    tog('terminal.welcome', 'welcome line', 'the one-line hint before you have typed anything.', 'build');
+    text('terminal.placeholder', 'placeholder', 'what the empty prompt says.', 'type a command · help', 'build');
+    drop('terminal.capture', 'add writes to', 'the add and todo add commands put a line in today\'s daily note, or in one inbox note.', { daily: "today's daily note", inbox: 'an inbox note' }, 'look');
+    text('terminal.inbox', 'inbox note', 'the path of the inbox note. it is made if it is missing.', 'inbox.md', 'look');
+    }
+
+    head('daily notes');
+    new UiSetting(containerEl).setDesc(ui('used by the daily note shortcut, the calendar, the journal entries count and the add command.'));
     new UiSetting(containerEl)
       .setName('journal note format')
       .setDesc('for the journal entries count and the daily note command. leave empty to use the core daily notes plugin, or YYYY-MM-DD.')
@@ -2533,16 +3776,7 @@ class HomeSettingTab extends PluginSettingTab {
       .addText((t) => t.setPlaceholder(plugin.dailyConfig().folder || '/').setValue(s.daily.folder).onChange((v) => { s.daily.folder = v.trim(); apply('data'); }));
 
     /* ── fortune ── */
-    head('fortune');
-    drop('quote.mode', 'pick', 'daily shows the same line all day. random picks a new one each time the page opens.', { daily: 'one per day', random: 'random' }, 'data');
-    area('quote.lines', 'lines', 'one per line.', 6, 'data');
 
-    /* ── shell ── */
-    head('shell');
-    text('shell.placeholder', 'placeholder', 'what the empty prompt says.', 'type a command · help', 'build');
-    slide('shell.outputLines', 'output height', 'lines of output shown before it scrolls.', 2, 16, 1, 'look', '');
-
-    /* ── colours ── */
     head('colours');
     const pickers = [];
     let presetDrop = null;
@@ -2624,7 +3858,7 @@ class HomeSettingTab extends PluginSettingTab {
     head('card and layout');
     drop('layout.frame', 'frame', 'one card puts everything in a single bordered box. each section gives every section its own box. none has no borders at all.',
       { one: 'one card', each: 'each section', none: 'none' }, 'look');
-    drop('layout.columns', 'columns', 'two columns pair up the half-width sections. narrow tabs always fall back to one.', { 1: 'one', 2: 'two' }, 'look');
+    drop('layout.columns', 'columns', 'sections flow down each column, balanced, so there are no gaps. full-width sections span them all. narrow tabs use fewer columns.', { 1: 'one', 2: 'two', 3: 'three' }, 'look');
     drop('layout.fit', 'when the page is taller than the tab', 'shrink scales the whole page down to fit, so it never scrolls. scroll leaves it full size and lets you scroll.',
       { shrink: 'shrink to fit', scroll: 'scroll' }, 'look');
     slide('layout.minScale', 'smallest size', 'shrinking stops here. if the page still does not fit, scrolling comes back so nothing is out of reach. turn a section off or lower the number of rows to get more room.', 30, 100, 5, 'look', '%');

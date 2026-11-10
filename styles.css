@@ -215,19 +215,21 @@ body.theme-light {
 }
 .mh-frame-each .mh-bar { margin-bottom: var(--mh-gap, 16px); }
 
-/* — the grid — */
-.mh-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--mh-cols, 2), minmax(0, 1fr));
-  gap: var(--mh-gap, 16px) calc(var(--mh-gap, 16px) * 1.5);
-  align-items: start;
+/* — sections flow down balanced columns: no gaps, and full-width ones span them all — */
+.mh { container-type: inline-size; container-name: mhc; }
+.mh-grid { column-count: var(--mh-cols, 2); column-gap: calc(var(--mh-gap, 16px) * 1.5); }
+.mh-sec {
+  min-width: 0;
+  position: relative;
+  break-inside: avoid;
+  margin-bottom: var(--mh-gap, 16px);
 }
-.mh-sec { min-width: 0; position: relative; }
-.mh-sec.is-wide { grid-column: 1 / -1; }
-.mh-grid > .mh-hint { grid-column: 1 / -1; }
-@container mhs (max-width: 680px) {
-  .mh-grid { grid-template-columns: minmax(0, 1fr); }
-}
+.mh-sec.is-wide { column-span: all; }
+.mh-grid > .mh-sec:last-child { margin-bottom: 0; }
+.mh-grid > .mh-hint { column-span: all; }
+/* the column count follows the width of the card itself, not the tab, because a shrunk page is laid out wider */
+@container mhc (max-width: 1000px) { .mh-cols-3 .mh-grid { column-count: 2; } }
+@container mhc (max-width: 680px)  { .mh-grid { column-count: 1; } }
 
 /* — powerline starship prompt (same as mish.music) — */
 .mh-bar {
@@ -379,22 +381,7 @@ body.theme-light {
 .mh-sc.is-missing { opacity: 0.4; }
 .mh-sec-shortcuts .mh-body.is-row { display: flex; flex-wrap: wrap; gap: 2px 2.5ch; }
 
-/* — fastfetch — */
-.mh-kv {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: 2.5ch;
-  row-gap: 3px;
-}
 .mh-k { color: var(--mh-t0); }
-.mh-v { min-width: 0; overflow-wrap: anywhere; }
-.mh-v.is-dim { color: var(--mh-dim); }
-.mh-pal { display: flex; gap: 2px; margin-top: 10px; }
-.mh-pal i { display: block; flex: 1 1 0; height: 8px; border-radius: 2px; }
-.mh-pal-dark { background: var(--background-modifier-border, #2a2a2f); }
-.mh-pal-light { background: var(--mh-fg); }
-.mh-bg0 { background: var(--mh-f0); } .mh-bg1 { background: var(--mh-f1); } .mh-bg2 { background: var(--mh-f2); }
-.mh-bg3 { background: var(--mh-f3); } .mh-bg4 { background: var(--mh-f4); } .mh-bg5 { background: var(--mh-f5); }
 
 /* — eza-style tree (recent, pinned) — the lines are drawn by css, so no font needs box characters — */
 .mh-row {
@@ -503,36 +490,176 @@ body.theme-light {
 /* — fortune — */
 .mh-quote { color: var(--mh-t1); overflow-wrap: anywhere; }
 
-/* — the shell — */
-.mh-sec-shell { border-top: 0; }
-.mh-frame-one .mh-sec-shell,
-.mh-frame-none .mh-sec-shell {
-  padding-top: 10px;
-  border-top: 1px solid var(--mh-rule);
-}
-.mh-frame-each .mh-sec-shell { padding-top: var(--mh-inner, 16px); }
+/* settings tab: the long text boxes go full width under their label */
+.mh-setting-area { flex-wrap: wrap; }
+.mh-setting-area .setting-item-control { width: 100%; }
+.mh-setting-area textarea { font-family: var(--font-monospace); font-size: 12px; }
 
-.mh-out {
-  margin-bottom: 6px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: calc(var(--mh-outlines, 8) * 1.5em);
-  overflow-y: auto;
-  cursor: pointer;                /* click it to dismiss */
-  color: var(--mh-t3);
-}
-.mh-out:empty { display: none; }
-.mh-out.is-bad { color: var(--mh-t0); }
-.mh-out::-webkit-scrollbar { width: 3px; }
-.mh-out::-webkit-scrollbar-thumb { border-radius: 2px; background: var(--mh-f0); }
+/* ═══ no scrolling: the page is scaled to fit by main.js (see fit()) ═══ */
+.mh-fit .mh-scroll { overflow-y: hidden; align-items: flex-start; }
+.mh-fit .mh-scroll.is-overflow { overflow-y: auto; }
+.mh-keep { text-transform: none; }
 
-.mh-line {
+/* ═══ colour classes used by the new sections and terminal output ═══ */
+.mh-t2 { color: var(--mh-t2); } .mh-t4 { color: var(--mh-t4); } .mh-t5 { color: var(--mh-t5); }
+.mh-dim { color: var(--mh-dim); } .mh-fg { color: var(--mh-fg); }
+.mh-bgdim { background: var(--mh-rule); } .mh-bgfg { background: var(--mh-fg); }
+.mh-today { background: var(--mh-f0); color: var(--mh-ink); border-radius: 3px; }
+.mh-gsum { color: var(--mh-dim); margin-bottom: 4px; }
+.mh-pbar i.on.mh-lv-ok { background: var(--mh-f3); }
+.mh-pbar i.on.mh-lv-warn { background: var(--mh-f2); }
+.mh-pbar i.on.mh-lv-bad { background: var(--mh-f0); }
+
+/* — calendar — */
+.mh-calhead { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.mh-caltitle { color: var(--mh-t0); cursor: pointer; }
+.mh-calbtn { color: var(--mh-dim); cursor: pointer; padding: 0 5px; border-radius: 4px; }
+.mh-calbtn:hover { color: var(--mh-fg); background: var(--mh-hover); }
+.mh-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  row-gap: 2px;
+  max-width: 24em;
+  text-align: center;
+}
+.mh-cal.has-wk { grid-template-columns: 3ch repeat(7, minmax(0, 1fr)); }
+.mh-calwd { color: var(--mh-dim); font-size: 0.9em; }
+.mh-calwk { color: var(--mh-dim); font-size: 0.85em; opacity: 0.6; }
+.mh-day { position: relative; line-height: 1.75; border-radius: 5px; cursor: pointer; }
+.mh-day:hover { background: var(--mh-hover); }
+.mh-day.is-out { color: var(--mh-dim); opacity: 0.4; }
+.mh-day.has-note { color: var(--mh-t3); }
+.mh-day.has-note::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: var(--mh-f3);
+}
+.mh-day.is-today { background: var(--mh-f0); color: var(--mh-ink); opacity: 1; }
+.mh-day.is-today::after { background: var(--mh-ink); }
+
+/* — focus timer — */
+.mh-fotop { display: flex; align-items: baseline; gap: 12px; }
+.mh-fotime { font-size: calc(26px * var(--mh-scale, 1)); line-height: 1.15; color: var(--mh-fg); }
+.mh-fobar { margin: 6px 0; max-width: none; }
+.mh-fobtns { display: flex; gap: 2.5ch; }
+.mh-btn { color: var(--mh-t3); cursor: pointer; }
+.mh-btn:nth-child(2) { color: var(--mh-t4); }
+.mh-btn:nth-child(3) { color: var(--mh-t5); }
+.mh-btn:hover { color: var(--mh-t0); }
+.mh-fosum { color: var(--mh-dim); margin-top: 4px; }
+
+/* — system — */
+.mh-sys {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 2ch;
+  row-gap: 4px;
+  align-items: center;
+}
+.mh-sv { display: flex; align-items: center; gap: 1ch; min-width: 0; }
+.mh-sv .mh-pbar { flex: 1 1 0; max-width: 220px; }
+.mh-sval { flex: 0 0 auto; color: var(--mh-dim); white-space: nowrap; }
+
+/* — tags and folders — */
+.mh-brow {
   display: flex;
   align-items: center;
   gap: 1ch;
-  height: 20px;
-  cursor: text;
+  min-width: 0;
+  height: 22px;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 4px;
 }
+.mh-brow:hover { background: var(--mh-hover); }
+.mh-minibar { flex: 0 0 11ch; max-width: none; }
+.mh-minibar i { height: 7px; }
+
+/* — random note — */
+.mh-rtitle { cursor: pointer; margin-bottom: 2px; }
+.mh-rtitle:hover { text-decoration: underline; }
+.mh-rline { display: flex; gap: 1.5ch; cursor: pointer; }
+.mh-rnum { flex: 0 0 2ch; text-align: right; color: var(--mh-dim); }
+.mh-rtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-rline:hover .mh-rtext { color: var(--mh-t0); }
+
+/* — git log — */
+.mh-gl { display: flex; align-items: baseline; gap: 1.5ch; min-height: 22px; white-space: nowrap; }
+.mh-glmsg { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* ═══ the terminal ═══ */
+.mh-term {
+  border: 1px solid var(--mh-rule);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--mh-fg) 4%, transparent);
+  overflow: hidden;
+}
+.mh-term-plain { border: 0; border-radius: 0; background: none; overflow: visible; }
+
+.mh-tbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 26px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--mh-rule);
+  color: var(--mh-dim);
+  font-size: 0.92em;
+}
+.mh-tdots { display: flex; gap: 6px; flex: 0 0 auto; }
+.mh-tdot { display: block; width: 9px; height: 9px; border-radius: 50%; }
+.mh-tdot:first-child { cursor: pointer; }
+.mh-ttitle { flex: 1 1 auto; min-width: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-tcorner { flex: 0 0 auto; opacity: 0.7; }
+
+/* scrollback: a fixed height, so the page never changes size while you type */
+.mh-tout {
+  height: calc(var(--mh-termlines, 5) * 1.5em + 10px);
+  padding: 6px 10px 4px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.mh-tout::-webkit-scrollbar { width: 0; height: 0; }
+.mh-term-plain .mh-tout { padding: 0 0 4px; }
+.mh-te { margin-bottom: 3px; }
+.mh-ln { min-height: 1.5em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mh-tcmd { color: var(--mh-fg); }
+.mh-tcode .mh-hl-bad { color: var(--mh-t0); }
+.mh-chev.is-bad { color: var(--mh-t0); }
+.is-link { cursor: pointer; }
+.is-link:hover { text-decoration: underline; }
+
+/* the tab-completion menu */
+.mh-menu {
+  display: none;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--mh-rule);
+}
+.mh-menu.is-open { display: flex; }
+.mh-chip { padding: 0 7px; border-radius: 6px; background: var(--mh-hover); color: var(--mh-fg); }
+.mh-chip.is-sel { background: var(--mh-f3); color: var(--mh-ink); }
+.mh-chip.is-more { color: var(--mh-dim); background: none; }
+
+/* the prompt: a powerline of pills, then the line you type on */
+.mh-tprompt { padding: 6px 10px 8px; border-top: 1px solid var(--mh-rule); }
+.mh-term-plain .mh-tprompt { padding: 6px 0 0; }
+.mh-pl { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.mh-pl.is-hidden { display: none; }
+.mh-plseg { display: flex; align-items: center; min-width: 0; }
+.mh-pl .mh-seg { height: 18px; line-height: 18px; font-size: calc(10.5px * var(--mh-scale, 1)); }
+.mh-ok { background: var(--mh-f3); }
+.mh-err { background: var(--mh-f0); }
+.mh-rp { color: var(--mh-dim); flex: 0 0 auto; }
+
+.mh-line { display: flex; align-items: center; gap: 1ch; height: 20px; cursor: text; }
 .mh-inwrap { position: relative; flex: 1 1 auto; min-width: 0; }
 .mh .mh-input {
   display: block;
@@ -551,7 +678,6 @@ body.theme-light {
   user-select: text;
 }
 .mh .mh-input::placeholder { color: var(--mh-dim); opacity: 0.8; }
-
 .mh-hl {
   position: absolute;
   inset: 0;
@@ -563,7 +689,9 @@ body.theme-light {
   align-items: center;
   color: var(--mh-fg);
 }
+.mh-hl-row { display: inline-flex; white-space: pre; }
 .mh-hl-in { display: inline-block; white-space: pre; }
+.mh-ghost { color: var(--mh-dim); opacity: 0.55; white-space: pre; }
 .mh-hl-meas { position: absolute; left: 0; top: 0; visibility: hidden; white-space: pre; }
 .mh-caret {
   position: absolute;
@@ -592,35 +720,16 @@ body.theme-light {
 .mh-inwrap.has-sel .mh-caret { display: none !important; }
 .mh-inwrap.is-empty .mh-input { text-indent: 2ch; }
 @keyframes mh-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-
 .mh-hl-cmd  { color: var(--mh-t3); }
 .mh-hl-bad  { color: var(--mh-t0); }
 .mh-hl-flag { color: var(--mh-t5); }
 .mh-hl-str  { color: var(--mh-t1); }
 
-/* settings tab: the long text boxes go full width under their label */
-.mh-setting-area { flex-wrap: wrap; }
-.mh-setting-area .setting-item-control { width: 100%; }
-.mh-setting-area textarea { font-family: var(--font-monospace); font-size: 12px; }
+/* the six fills as background classes: terminal dots, ls colours, the stats colour bar */
+.mh-bg0 { background: var(--mh-f0); } .mh-bg1 { background: var(--mh-f1); } .mh-bg2 { background: var(--mh-f2); }
+.mh-bg3 { background: var(--mh-f3); } .mh-bg4 { background: var(--mh-f4); } .mh-bg5 { background: var(--mh-f5); }
 
-/* ═══ no scrolling: the page is scaled to fit by main.js (see fit()) ═══ */
-.mh-fit .mh-scroll { overflow-y: hidden; align-items: flex-start; }
-.mh-fit .mh-scroll.is-overflow { overflow-y: auto; }
-.mh-keep { text-transform: none; }
-
-/* the shell's output floats above the prompt instead of pushing the page taller,
-   so the page never re-scales while you type commands */
-.mh-sec-shell .mh-body { position: relative; }
-.mh-out {
-  position: absolute;
-  left: -6px;
-  right: -6px;
-  bottom: calc(100% + 8px);
-  z-index: 8;
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--mh-rule);
-  border-radius: 8px;
-  background: var(--background-primary, #0f0f12);
-  box-shadow: 0 6px 24px var(--mz-shadow);
-}
+/* a margin does not survive at the end of a column, so full-width sections bring their own gap above them */
+.mh-sec.is-wide { margin-top: var(--mh-gap, 16px); }
+.mh-grid > .mh-sec:first-child { margin-top: 0; }
+.mh-day { line-height: 1.55; }

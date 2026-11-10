@@ -1,9 +1,9 @@
 {
   "id": "mish-home",
   "name": "mish.home",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "minAppVersion": "1.15.0",
-  "description": "A terminal-style home page you open Obsidian to: starship prompt, block-letter banner, greeting, shortcuts, recent notes as an eza tree, open todos, a streak grid, fastfetch-style stats and a small shell. Every section is optional and fully themeable. macOS, Windows and Linux desktop.",
+  "description": "A terminal-style home page you open Obsidian to: starship prompt, block-letter banner, greeting, calendar, recent notes as an eza tree, todos, streak grid, focus timer, system monitor and a real little terminal with autosuggestions and tab completion. Every section is optional and fully themeable. Desktop only.",
   "author": "mishti",
   "authorUrl": "https://github.com/mishtiiikrishnaa",
   "isDesktopOnly": true
