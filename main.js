@@ -232,9 +232,9 @@ const DEFAULT_SETTINGS = {
 
   shortcuts: { items: DEFAULT_SHORTCUTS, layout: 'list', colour: 'plain', hotkeys: true, hideMissing: true },
 
-  recent: { mode: 'opened', count: 8, types: 'notes', extensions: 'hide', nameColour: 'rainbow', age: true, folder: false, tree: true },
+  recent: { mode: 'opened', count: 8, types: 'notes', extensions: 'hide', nameColour: 'type', age: true, folder: false, tree: true },
 
-  pinned: { paths: '', bookmarks: true, extensions: 'hide', nameColour: 'rainbow', tree: true },
+  pinned: { paths: '', bookmarks: true, extensions: 'hide', nameColour: 'type', tree: true },
 
   tasks: { count: 6, scan: 40, complete: true, showNote: true },
 
@@ -259,6 +259,7 @@ const DEFAULT_SETTINGS = {
     rprompt: true,                         /* the time on the right of the prompt */
     suggest: true,                         /* grey autosuggestions from your history (press → to accept) */
     welcome: true,
+    startup: 'stats, help',                /* commands run once when obsidian opens the pane, so it is never an empty box. comma separated, empty = none */
     placeholder: 'type a command · help',
     capture: 'daily',                      /* daily | inbox: where "add" and "todo add" write */
     inbox: 'inbox.md',
@@ -267,8 +268,8 @@ const DEFAULT_SETTINGS = {
   daily: { folder: '', format: '' },    /* empty = whatever the core daily notes plugin says, else the vault root and YYYY-MM-DD */
 
   /* the card */
-  layout: { frame: 'one', columns: 3, width: 1100, gap: 14, inner: 14, fit: 'shrink', minScale: 55, split: 'right', sideWidth: 400 },   /* frame: one | each | none. fit: shrink | scroll */
-  card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 12, pad: 16, textSize: 100 },
+  layout: { frame: 'one', columns: 3, width: 1100, gap: 18, inner: 18, fit: 'shrink', minScale: 85, split: 'right', sideWidth: 400, scaleV2: false },   /* frame: one | each | none. fit: shrink | scroll */
+  card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 14, pad: 20, textSize: 100 },
 };
 
 /* a data.json from an older version, or one edited by hand, must never break the page */
@@ -364,6 +365,7 @@ const sanitise = (cfg) => {
   tm.capture = oneOf(tm.capture, ['daily', 'inbox'], 'daily');
   tm.height = num(tm.height, 2, 20, 4);
   if (typeof tm.inbox !== 'string' || !tm.inbox.trim()) tm.inbox = 'inbox.md';
+  if (typeof tm.startup !== 'string') tm.startup = 'stats, help';
 
   const l = cfg.layout;
   l.frame = oneOf(l.frame, ['one', 'each', 'none'], 'one');
@@ -372,7 +374,9 @@ const sanitise = (cfg) => {
   l.gap = num(l.gap, 0, 40, 14);
   l.inner = num(l.inner, 0, 40, 14);
   l.fit = oneOf(l.fit, ['shrink', 'scroll'], 'shrink');
-  l.minScale = num(l.minScale, 30, 100, 55);
+  l.minScale = num(l.minScale, 30, 100, 85);
+  /* 1.2: the old default (55) squeezed the page too small in a narrow tab. move it once, and only if it was never changed */
+  if (!l.scaleV2) { if (l.minScale === 55) l.minScale = 85; l.scaleV2 = true; }
   l.split = oneOf(l.split, ['right', 'off'], 'right');      /* right = the terminal is a tall pane beside the sections */
   l.sideWidth = num(l.sideWidth, 260, 640, 400);
 
@@ -833,6 +837,21 @@ class MishHome extends Plugin {
       this.settings.banner.size = d.banner.size;
       this.settings.streak.cell = d.streak.cell;
       this.settings.streak.gap = d.streak.gap;
+    }
+    /* 1.3: a calmer page. the spacing moved once, and only where it was still the old default,
+       so anyone who had already tuned it keeps their numbers. */
+    if ((saved.v || 0) < 4) {
+      const l = this.settings.layout;
+      const c = this.settings.card;
+      if (l.gap === 14) l.gap = 18;
+      if (l.inner === 14) l.inner = 18;
+      if (c.radius === 12) c.radius = 14;
+      if (c.pad === 16) c.pad = 20;
+      /* the help dump filled the terminal pane with a wall of text on every launch */
+      if (this.settings.terminal.startup === 'stats, help') this.settings.terminal.startup = 'stats';
+      /* a rainbow per row in the file lists was the busiest part of the page */
+      if (this.settings.recent.nameColour === 'rainbow') this.settings.recent.nameColour = 'type';
+      if (this.settings.pinned.nameColour === 'rainbow') this.settings.pinned.nameColour = 'type';
     }
     this.opened = Array.isArray(saved.opened) ? saved.opened.filter((p) => typeof p === 'string').slice(0, 60) : [];
     this.history = Array.isArray(saved.history) ? saved.history.filter((p) => typeof p === 'string').slice(-60) : [];
@@ -1517,7 +1536,7 @@ class MishHome extends Plugin {
 
   async saveAll() {
     await this.saveData({
-      v: 3,
+      v: 4,
       settings: this.settings,
       focusLog: this.focusLog,
       opened: this.opened,
@@ -1588,6 +1607,7 @@ class HomeView extends ItemView {
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (this.focusShell()) e.preventDefault();
     });
+    this.registerDomEvent(window, 'resize', () => this.scheduleFit());
     this.build();
     if (this.s.focusShell) window.setTimeout(() => this.focusShell(), 80);
   }
@@ -1604,10 +1624,11 @@ class HomeView extends ItemView {
   }
 
   /* ── fitting the page to the tab ───────────────────────────────────────────
-     the home page should never need scrolling. the card is laid out at the width it will end up
-     with, measured, and when it is too tall it is scaled down (and laid out wider by the same
-     factor, so it still fills the same width and needs fewer lines). if even the smallest allowed
-     scale is not enough, scrolling comes back, because unreachable content is worse. */
+     the home page never scrolls, at any window size. the card is laid out, measured, and scaled
+     down until it fits both ways. a smaller scale means the card is laid out wider, so the text
+     reflows into more columns and fewer lines as it shrinks; that is what makes the fit converge
+     on the largest scale that still fits. there is no floor and no fallback: if the tab is tiny,
+     the page gets tiny. an unscrollable page beats a hidden one. */
   scheduleFit() {
     if (this.fitRaf) return;
     this.fitRaf = requestAnimationFrame(() => {
@@ -1616,61 +1637,107 @@ class HomeView extends ItemView {
     });
   }
 
+  /* the card can change height without the tab changing size (a late font, the battery row,
+     an async section landing). compare, and refit when it really moved. */
+  fitCheck() {
+    const card = this.cardEl;
+    if (!card || !this.contentEl.classList.contains('mh-fit')) return;
+    if (Math.abs(card.offsetHeight - (this.lastH || 0)) > 1) this.scheduleFit();
+  }
+
   fit() {
     const scroll = this.scrollEl;
     const card = this.cardEl;
     if (!scroll || !card) return;
+    const host = this.contentEl;
     const L = this.s.layout;
-    card.style.width = '';
-    card.style.margin = '';
+    const c = this.s.card;
+
     card.style.transform = '';
     card.style.transformOrigin = '';
-    scroll.classList.remove('is-overflow');
-    this.contentEl.classList.toggle('mh-fit', L.fit === 'shrink');
-    if (L.fit !== 'shrink') return;
+    card.style.width = '';
+    card.style.margin = '';
+    host.classList.remove('mh-fit', 'mh-compact', 'mh-flow');
+    if (L.fit !== 'shrink') {
+      /* the fit pass owns --mh-cols; hand it back before leaving, or the column count
+         from the last fit would outlive the mode that asked for it. */
+      host.style.setProperty('--mh-cols', String(L.columns));
+      host.classList.add('mh-flow');
+      return;
+    }
 
     const cs = (scroll.ownerDocument.defaultView || window).getComputedStyle(scroll);
-    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-    const availW = scroll.clientWidth - padX;
-    const availH = scroll.clientHeight - padY;
-    if (!(availW > 80 && availH > 80)) return;       /* not laid out yet */
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padT = parseFloat(cs.paddingTop) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const padB = parseFloat(cs.paddingBottom) || 0;
+    const availW = scroll.clientWidth - padL - padR;
+    const availH = scroll.clientHeight - padT - padB;
+    if (!(availW > 60 && availH > 60)) return;       /* not laid out yet */
 
-    const baseW = Math.min(availW, cardWidth(this.s));
-    const floor = L.minScale / 100;
-    /* the card is laid out at baseW / k and then scaled by k, so it always ends up baseW wide.
-       a smaller k means a wider layout, which means fewer wrapped lines and maybe more columns,
-       so the visible height (layout height * k) only ever shrinks as k shrinks. bisect for the
-       largest k that fits. */
-    const visible = (k) => {
+    /* the column count follows the room there actually is, not the width the card is laid out
+       at. otherwise a narrow tab would widen itself into three toothpick columns and scale the
+       text into dust to get there. */
+    const mainW = availW - (splitActive(this.s) ? L.sideWidth : 0);
+    const cols = Math.max(1, Math.min(Number(L.columns) || 1, Math.floor(mainW / 290)));
+    host.style.setProperty('--mh-cols', String(cols));
+
+    const baseW = Math.min(availW, Math.max(160, cardWidth(this.s)));
+    const heightAt = (k) => {
       card.style.width = (baseW / k) + 'px';
-      return card.offsetHeight * k;
+      return card.offsetHeight;
     };
-    let k = 1;
-    if (visible(1) > availH) {
+    const visible = (k) => heightAt(k) * k;
+
+    /* bisect for the largest scale that fits. the visible height only ever falls as k falls,
+       so this is well behaved even when the column count changes under it. */
+    const solve = () => {
+      if (heightAt(1) <= availH) return 1;
+      const floor = 0.18;
+      let k;
       if (visible(floor) > availH) {
         k = floor;
       } else {
         let lo = floor;
         let hi = 1;
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < 8; i++) {
           const mid = (lo + hi) / 2;
           if (visible(mid) <= availH) lo = mid; else hi = mid;
         }
         k = lo;
       }
-    }
-    card.style.width = (baseW / k) + 'px';
-    const h = card.offsetHeight;
+      /* one exact correction, for rounding and for anything that refused to shrink.
+         scaling the transform can only make the page smaller, so this always fits. */
+      const h = heightAt(k);
+      if (h * k > availH) k *= availH / (h * k);
+      return k;
+    };
 
-    const c = this.s.card;
-    const offX = c.hAlign === 'left' ? 0 : Math.max(0, (availW - baseW) / 2);
-    const offY = c.vAlign === 'top' ? 0 : Math.max(0, (availH - h * k) / 2);
+    let k = solve();
+    /* if fitting costs too much size, drop the decorative command lines and tighten the
+       spacing first. less to read, and less height to squeeze. */
+    if (k < 0.8) {
+      host.classList.add('mh-compact');
+      k = solve();
+    }
+
+    /* the last word on the fit: if anything at all is still too tall, scale the rest of the way
+       out. this cannot loop forever, and it cannot leave a scrollbar behind. */
+    let h = heightAt(k);
+    for (let i = 0; i < 3 && h * k > availH; i++) {
+      k *= availH / (h * k);
+      h = heightAt(k);
+    }
+    this.lastH = h;
+    const shownW = baseW;
+    const shownH = h * k;
+    const offX = padL + (c.hAlign === 'left' ? 0 : Math.max(0, (availW - shownW) / 2));
+    const offY = padT + (c.vAlign === 'top' ? 0 : Math.max(0, (availH - shownH) / 2));
+
+    host.classList.add('mh-fit');
     card.style.transformOrigin = '0 0';
-    card.style.transform = k < 1 ? 'scale(' + k + ')' : '';
-    /* the negative bottom margin cancels the room the unscaled box would take */
-    card.style.margin = offY + 'px 0 ' + (h * k - h) + 'px ' + offX + 'px';
-    if (h * k > availH + 1) scroll.classList.add('is-overflow');
+    card.style.transform = 'translate(' + offX + 'px, ' + offY + 'px) scale(' + k + ')';
+    card.style.width = (baseW / k) + 'px';
   }
 
   focusShell() {
@@ -1839,6 +1906,10 @@ class HomeView extends ItemView {
       try { this.fill_system(this.refs.system.body); } catch (e) { this.broke('system', e); }
       if (before !== this.sysRows) this.scheduleFit();      /* the battery row can show up late */
     }
+    if (now - (this.fitAt || 0) >= 1000) {
+      this.fitAt = now;
+      this.fitCheck();
+    }
     const minute = Math.floor(now / 60000);
     if (minute !== this.minute) {
       this.minute = minute;
@@ -1992,7 +2063,7 @@ class HomeView extends ItemView {
     items.forEach((it, i) => {
       const known = Boolean(this.app.commands.commands[it.id]);
       const row = el('div', 'mh-sc' + (known ? '' : ' is-missing'));
-      row.appendChild(el('span', 'mh-chev mh-c' + (i % COLOURS), '❯'));
+      row.appendChild(el('span', 'mh-chev' + (sc.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), '❯'));
       row.appendChild(el('span', 'mh-sclabel' + (sc.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), it.label));
       if (sc.hotkeys && known) {
         const hk = this.plugin.hotkeyFor(it.id);
@@ -2415,7 +2486,7 @@ class HomeView extends ItemView {
     body.classList.toggle('is-row', l.layout === 'row');
     items.forEach((it, i) => {
       const row = el('div', 'mh-sc');
-      row.appendChild(el('span', 'mh-chev mh-c' + (i % COLOURS), '❯'));
+      row.appendChild(el('span', 'mh-chev' + (l.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), '❯'));
       row.appendChild(el('span', 'mh-sclabel' + (l.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), it.label));
       let host = '';
       try { host = new URL(/^[a-z]+:\/\//i.test(it.id) ? it.id : 'https://' + it.id).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
@@ -2816,6 +2887,26 @@ class HomeView extends ItemView {
 
     this.renderScrollback();
     this.updatePrompt();
+    this.runStartup();
+  }
+
+  /* the tall pane would be a black box with one line in it, so the first time it opens in a session it
+     runs a few commands, like a login message. they are not added to your history, and clear empties them. */
+  runStartup() {
+    const p = this.plugin;
+    if (!splitActive(this.s) || p.startupDone || p.scrollback.length) return;
+    const list = String(this.s.terminal.startup || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 6);
+    if (!list.length) return;
+    /* wait for the page to be laid out: in a narrow tab the terminal is a short window under the sections, and a
+       login message would just scroll past in it */
+    window.setTimeout(async () => {
+      const sh = this.refs.shell;
+      if (p.startupDone || p.scrollback.length || !sh || !sh.out || sh.out.clientHeight < 140) return;
+      p.startupDone = true;
+      for (const c of list) {
+        try { await this.exec(c, true); } catch (e) { console.error('mish.home: startup command failed', e); }
+      }
+    }, 250);
   }
 
   /* ── completion ────────────────────────────────────────────────────────── */
@@ -2930,12 +3021,14 @@ class HomeView extends ItemView {
 
   /* ── running things ────────────────────────────────────────────────────── */
 
-  async exec(line) {
+  async exec(line, quiet) {
     const raw = line.trim();
     if (!raw) return;
     const p = this.plugin;
-    if (p.history[p.history.length - 1] !== raw) p.history.push(raw);
-    p.persist();
+    if (!quiet) {
+      if (p.history[p.history.length - 1] !== raw) p.history.push(raw);
+      p.persist();
+    }
 
     const tokens = tokenise(raw);
     const name = tokens[0].toLowerCase();
@@ -3784,6 +3877,7 @@ class HomeSettingTab extends PluginSettingTab {
       { powerline: 'powerline', compact: 'compact' }, 'build');
     tog('terminal.rprompt', 'time on the right', 'the time at the right end of the powerline.', 'build');
     tog('terminal.suggest', 'autosuggestions', 'grey suggestions from your history as you type. press → to take one.', 'look');
+    text('terminal.startup', 'startup commands', 'run once when the terminal pane first opens, so it has something in it. separate with commas. leave empty for none. only used when the terminal is a pane.', 'stats, help', 'build');
     tog('terminal.welcome', 'welcome line', 'the one-line hint before you have typed anything.', 'build');
     text('terminal.placeholder', 'placeholder', 'what the empty prompt says.', 'type a command · help', 'build');
     drop('terminal.capture', 'add writes to', 'the add and todo add commands put a line in today\'s daily note, or in one inbox note.', { daily: "today's daily note", inbox: 'an inbox note' }, 'look');
@@ -3888,9 +3982,10 @@ class HomeSettingTab extends PluginSettingTab {
     drop('layout.split', 'terminal', 'right puts the terminal in a tall pane beside the sections, like a tmux split. off keeps it as a short row under them.',
       { right: 'tall pane on the right', off: 'row at the bottom' }, 'build');
     slide('layout.sideWidth', 'terminal pane width', 'only used when the terminal is a pane. the pane is added to the maximum width below, so the sections keep their room.', 260, 640, 10, 'look', ' px');
-    drop('layout.fit', 'when the page is taller than the tab', 'shrink scales the whole page down to fit, so it never scrolls. scroll leaves it full size and lets you scroll.',
+    drop('layout.fit', 'when the page is taller than the tab', 'shrink scales the whole page down until it fits, so the page never scrolls, at any window size. scroll leaves it at full size and lets you scroll, which defeats the point of a home page.',
       { shrink: 'shrink to fit', scroll: 'scroll' }, 'look');
-    slide('layout.minScale', 'smallest size', 'shrinking stops here. if the page still does not fit, scrolling comes back so nothing is out of reach. turn a section off or lower the number of rows to get more room.', 30, 100, 5, 'look', '%');
+    new UiSetting(containerEl)
+      .setDesc(ui('when the tab is too small for the page, the command lines above each section step aside and the spacing tightens first, so the page keeps its size for as long as it can.'));
     slide('layout.width', 'maximum width', 'how wide the page gets in a big tab.', 420, 1400, 20, 'look', ' px');
     slide('layout.gap', 'gap between sections', '', 0, 40, 1, 'look', ' px');
     slide('layout.inner', 'card padding', 'space between a border and what is inside it.', 0, 40, 1, 'look', ' px');

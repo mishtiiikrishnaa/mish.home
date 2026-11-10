@@ -1,5 +1,5 @@
 {
-  "v": 3,
+  "v": 4,
   "settings": {
     "lowercaseUi": true,
     "lowercaseText": true,
@@ -163,7 +163,7 @@
       "count": 8,
       "types": "notes",
       "extensions": "hide",
-      "nameColour": "rainbow",
+      "nameColour": "type",
       "age": true,
       "folder": false,
       "tree": true
@@ -172,7 +172,7 @@
       "paths": "",
       "bookmarks": true,
       "extensions": "hide",
-      "nameColour": "rainbow",
+      "nameColour": "type",
       "tree": true
     },
     "tasks": {
@@ -246,6 +246,7 @@
       "rprompt": true,
       "suggest": true,
       "welcome": true,
+      "startup": "stats",
       "placeholder": "type a command · help",
       "capture": "daily",
       "inbox": "inbox.md"
@@ -258,10 +259,13 @@
       "frame": "one",
       "columns": 3,
       "width": 1100,
-      "gap": 14,
-      "inner": 14,
+      "gap": 18,
+      "inner": 18,
       "fit": "shrink",
-      "minScale": 55
+      "minScale": 85,
+      "split": "right",
+      "sideWidth": 400,
+      "scaleV2": true
     },
     "card": {
       "hAlign": "centre",
@@ -269,8 +273,8 @@
       "ring": "rainbow",
       "ringWidth": 1,
       "angle": 135,
-      "radius": 12,
-      "pad": 16,
+      "radius": 14,
+      "pad": 20,
       "textSize": 100
     }
   },

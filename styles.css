@@ -155,8 +155,7 @@ body.theme-light {
   min-height: 0;
   display: flex;                 /* margin:auto on the card centres it both ways */
   padding: var(--mh-pad, 16px);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   container-type: inline-size;
   container-name: mhs;
 }
@@ -228,8 +227,8 @@ body.theme-light {
 .mh-grid > .mh-sec:last-child { margin-bottom: 0; }
 .mh-grid > .mh-hint { column-span: all; }
 /* the column count follows the width of the card itself, not the tab, because a shrunk page is laid out wider */
-@container mhc (max-width: 1000px) { .mh-cols-3 .mh-grid { column-count: 2; } }
-@container mhc (max-width: 680px)  { .mh-grid { column-count: 1; } }
+@container mhc (max-width: 1000px) { .mh-root:not(.mh-fit) .mh-cols-3 .mh-grid { column-count: 2; } }
+@container mhc (max-width: 560px)  { .mh-root:not(.mh-fit) .mh-grid { column-count: 1; } }
 
 /* — powerline starship prompt (same as mish.music) — */
 .mh-bar {
@@ -495,9 +494,7 @@ body.theme-light {
 .mh-setting-area .setting-item-control { width: 100%; }
 .mh-setting-area textarea { font-family: var(--font-monospace); font-size: 12px; }
 
-/* ═══ no scrolling: the page is scaled to fit by main.js (see fit()) ═══ */
-.mh-fit .mh-scroll { overflow-y: hidden; align-items: flex-start; }
-.mh-fit .mh-scroll.is-overflow { overflow-y: auto; }
+/* ═══ no scrolling: the page is scaled to fit by main.js (see fit(), and 1.3 below) ═══ */
 .mh-keep { text-transform: none; }
 
 /* ═══ colour classes used by the new sections and terminal output ═══ */
@@ -812,3 +809,140 @@ body.theme-light {
   .mh-side .mh-tout { height: calc(var(--mh-termlines, 5) * 1.5em + 10px); }
   .mh-side .mh-tout > :first-child { margin-top: 0; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   1.3 · never scrolls, and a calmer page
+
+   the card is measured and scaled by main.js (fit()), so the scroll box has
+   nothing left to scroll at any window size. the rest of this block is the
+   rehaul: one surface, quiet section headers, room to breathe, and a
+   hierarchy you can read without following the rainbow everywhere.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* — the fit: the card is placed by transform, never by flow — */
+.mh-scroll { position: relative; }
+.mh-flow .mh-scroll { overflow-y: auto; }
+.mh-fit .mh-scroll { display: block; overflow: hidden; scrollbar-width: none; }
+.mh-fit .mh-scroll::-webkit-scrollbar { width: 0; height: 0; }
+.mh-fit .mh {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+
+/* — the card: a quiet surface under the rainbow ring — */
+.mh-frame-one .mh {
+  padding: calc(var(--mh-inner, 18px) * 1.15);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--mh-fg) 4%, transparent),
+    color-mix(in srgb, var(--mh-fg) 2%, transparent) 180px);
+  box-shadow: 0 32px 70px -44px var(--mz-shadow);
+}
+.mh-frame-each .mh-sec {
+  background: color-mix(in srgb, var(--mh-fg) 2%, transparent);
+}
+
+/* — sections: a hairline header, and more air between them — */
+.mh-grid { column-gap: calc(var(--mh-gap, 18px) * 1.8); }
+.mh-sec { margin-bottom: calc(var(--mh-gap, 18px) * 1.35); }
+.mh-sec.is-wide { margin-top: calc(var(--mh-gap, 18px) * 1.35); }
+.mh-grid > .mh-sec:first-child { margin-top: 0; }
+.mh-grid > .mh-sec:last-child { margin-bottom: 0; }
+
+.mh-cmd {
+  height: auto;
+  gap: 0.7ch;
+  margin: 0 0 10px;
+  font-size: calc(11px * var(--mh-scale, 1));
+  letter-spacing: 0.02em;
+  color: var(--mh-dim);
+}
+.mh-cmd::after {
+  content: "";
+  flex: 1 1 auto;
+  min-width: 14px;
+  height: 1px;
+  margin-left: 12px;
+  background: linear-gradient(90deg, var(--mh-rule), transparent 88%);
+}
+.mh-cmd .mh-chev + .mh-exe,
+.mh-cmd .mh-exe + .mh-arg { margin-left: 0; }
+.mh-chev { color: var(--mh-t3); opacity: 0.85; }
+.mh-exe { color: color-mix(in oklab, var(--mh-t3) 70%, var(--mh-fg)); }
+.mh-arg { color: var(--mh-dim); }
+
+/* the columns give way sooner, so the page is never three narrow ribbons */
+@container mhc (max-width: 1180px) { .mh-root:not(.mh-fit) .mh-cols-3 .mh-grid { column-count: 2; } }
+@container mhc (max-width: 640px) { .mh-root:not(.mh-fit) .mh-grid { column-count: 1; } }
+
+/* — the prompt — */
+.mh-bar { margin-bottom: calc(var(--mh-gap, 18px) * 1.05); }
+.mh-seg {
+  height: 24px;
+  line-height: 24px;
+  font-size: calc(11.5px * var(--mh-scale, 1));
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+}
+.mh-seg:first-child { border-radius: 12px 0 0 12px; }
+.mh-seg:last-child { border-radius: 0 12px 12px 0; }
+.mh-seg:first-child:last-child { border-radius: 12px; }
+
+/* — greeting — */
+.mh-hello { font-size: calc(20px * var(--mh-scale, 1)); letter-spacing: -0.01em; line-height: 1.3; }
+.mh-date { font-size: 0.96em; margin-bottom: 6px; }
+.mh-gsum { margin-bottom: 6px; }
+.mh-sum { margin-bottom: 8px; }
+.mh-prog { margin-top: 7px; gap: 12px; }
+.mh-pbar { gap: 3px; }
+.mh-pbar i { border-radius: 2px; }
+
+/* — the banner gets a little air under it, not a halo — */
+.mh-banner { filter: drop-shadow(0 10px 28px color-mix(in srgb, var(--mh-f0) 14%, transparent)); }
+
+/* — rows: one hover language for every list — */
+.mh-row, .mh-sc, .mh-task, .mh-brow, .mh-rline, .mh-gl {
+  border-radius: 6px;
+  margin-inline: -6px;
+  padding-inline: 6px;
+}
+.mh-row, .mh-task, .mh-brow { height: 24px; }
+.mh-sc { min-height: 26px; }
+.mh-row:hover, .mh-sc:hover, .mh-brow:hover, .mh-rline:hover { background: var(--mh-hover); }
+/* side by side, the rows must not lean into each other */
+.mh-body.is-row .mh-sc { margin-inline: 0; padding-inline: 0; }
+.mh-kbd { background: color-mix(in srgb, var(--mh-fg) 7%, transparent); opacity: 0.85; }
+
+/* — calendar — */
+.mh-calhead { margin-bottom: 6px; }
+.mh-cal { max-width: 23em; row-gap: 3px; }
+.mh-day { border-radius: 6px; }
+
+/* — terminal — */
+.mh-term {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--mh-fg) 4.5%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mh-fg) 5%, transparent);
+}
+.mh-tbar { height: 30px; padding: 0 12px; letter-spacing: 0.01em; }
+.mh-tout { padding: 8px 12px 6px; }
+.mh-tprompt { padding: 7px 12px 9px; }
+.mh-term-plain .mh-tout { padding: 0 0 4px; }
+.mh-term-plain .mh-tprompt { padding: 6px 0 0; }
+
+/* — the split, with the same air as the columns — */
+.mh-split { column-gap: calc(var(--mh-gap, 18px) * 1.8); }
+.mh-side { min-height: 320px; }
+
+/* — when the tab is genuinely small: drop the decoration before the text — */
+.mh-compact .mh-cmd { display: none; }
+.mh-compact .mh-grid { column-gap: calc(var(--mh-gap, 18px) * 1.4); }
+.mh-compact .mh-sec { margin-bottom: calc(var(--mh-gap, 18px) * 0.85); }
+.mh-compact .mh-sec.is-wide { margin-top: calc(var(--mh-gap, 18px) * 0.85); }
+.mh-compact .mh-bar { margin-bottom: calc(var(--mh-gap, 18px) * 0.7); }
+.mh-compact .mh-row,
+.mh-compact .mh-task,
+.mh-compact .mh-brow { height: 21px; }
+.mh-compact .mh-sc { min-height: 22px; }
+.mh-compact .mh-hello { font-size: calc(18px * var(--mh-scale, 1)); }
+.mh-compact .mh-side { min-height: 260px; }
