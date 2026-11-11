@@ -153,19 +153,9 @@ body.theme-light {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  display: flex;                 /* margin:auto on the card centres it both ways */
-  padding: var(--mh-pad, 16px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  container-type: inline-size;
-  container-name: mhs;
-}
-/* thin rainbow scrollbar */
-.mh-scroll::-webkit-scrollbar { width: 4px; height: 0; }
-.mh-scroll::-webkit-scrollbar-track { background: transparent; }
-.mh-scroll::-webkit-scrollbar-thumb {
-  border-radius: 2px;
-  background: linear-gradient(var(--mh-f0), var(--mh-f1), var(--mh-f2), var(--mh-f3), var(--mh-f4), var(--mh-f5));
+  display: flex;
+  padding: var(--mh-pad, 14px);
+  overflow: hidden;                /* the page never scrolls: the grid below is exactly as big as the tab */
 }
 
 .mh,
@@ -179,24 +169,50 @@ body.theme-light {
   line-height: 1.5;
   letter-spacing: 0.005em;
   position: relative;
-  width: min(100%, var(--mh-w, 860px));
-  flex: 0 0 auto;
-  margin: var(--mh-mt, auto) auto auto var(--mh-ml, auto);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mh-gap, 12px);
   text-align: left;
   user-select: text;
 }
 
-/* thin rainbow ring, cut out with a mask so the card stays see-through.
-   "one card" rings the whole page, "each section" rings every section. */
-.mh-frame-one .mh,
-.mh-frame-each .mh-sec {
-  position: relative;
-  border-radius: var(--mh-radius, 12px);
+/* the grid: 12 columns, rows chosen by main.js (layoutDash) from the room there is */
+.mh-dash {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--mh-gap, 12px);
+  overflow: hidden;
 }
-.mh-frame-one .mh { padding: var(--mh-inner, 16px); }
-.mh-frame-each .mh-sec { padding: var(--mh-inner, 16px); }
-.mh-frame-one .mh::before,
-.mh-frame-each .mh-sec::before {
+
+/* a card */
+.mh-sec {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--mh-inner, 14px);
+  border-radius: var(--mh-radius, 14px);
+  container-type: inline-size;
+  container-name: mhsec;
+}
+.mh-sec.is-off { display: none; }
+
+/* card styles: soft (a quiet box), ring (a thin rainbow ring, cut out with a mask), flat (nothing) */
+.mh-frame-soft .mh-sec,
+.mh-frame-ring .mh-sec {
+  background: color-mix(in srgb, var(--mh-fg) 4%, transparent);
+}
+.mh-frame-soft .mh-sec { border: 1px solid var(--mh-rule); }
+.mh-frame-flat .mh-sec { padding-left: 2px; padding-right: 2px; }
+.mh-frame-ring .mh-sec::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -213,25 +229,59 @@ body.theme-light {
   mask-composite: exclude;
   pointer-events: none;
 }
-.mh-frame-each .mh-bar { margin-bottom: var(--mh-gap, 16px); }
-
-/* — sections flow down balanced columns: no gaps, and full-width ones span them all — */
-.mh { container-type: inline-size; container-name: mhc; }
-.mh-grid { column-count: var(--mh-cols, 2); column-gap: calc(var(--mh-gap, 16px) * 1.5); }
-.mh-sec {
-  min-width: 0;
-  position: relative;
-  break-inside: avoid;
-  margin-bottom: var(--mh-gap, 16px);
+/* the first card gets a soft rainbow wash */
+.mh-frame-soft .mh-sec-hero,
+.mh-frame-ring .mh-sec-hero {
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--mh-f0) 10%, transparent),
+    color-mix(in srgb, var(--mh-f4) 7%, transparent) 60%,
+    color-mix(in srgb, var(--mh-f5) 10%, transparent));
 }
-.mh-sec.is-wide { column-span: all; }
-.mh-grid > .mh-sec:last-child { margin-bottom: 0; }
-.mh-grid > .mh-hint { column-span: all; }
-/* the column count follows the width of the card itself, not the tab, because a shrunk page is laid out wider */
 
+/* the little coloured pill at the top of a card, the same shape as the prompt */
+.mh-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+  margin-bottom: 10px;
+  font-size: calc(11px * var(--mh-scale, 1));
+  white-space: nowrap;
+  overflow: hidden;
+}
+.mh-pill {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 18px;
+  padding: 0 13px 0 10px;
+  line-height: 18px;
+  color: var(--mh-ink);
+  border-radius: 9px 0 0 9px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
+}
+.mh-pf0 { background: var(--mh-f0); } .mh-pf1 { background: var(--mh-f1); } .mh-pf2 { background: var(--mh-f2); }
+.mh-pf3 { background: var(--mh-f3); } .mh-pf4 { background: var(--mh-f4); } .mh-pf5 { background: var(--mh-f5); }
+.mh-shape-round .mh-pill,
+.mh-shape-flat .mh-pill { clip-path: none; padding: 0 9px; }
+.mh-shape-round .mh-pill { border-radius: 9px; }
+.mh-shape-flat .mh-pill { border-radius: 0; }
+.mh-head .mh-arg { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mh-meta { margin-left: auto; flex: 0 0 auto; color: var(--mh-dim); }
+
+/* what is inside a card. it may never be taller than the card: main.js hides rows that do not fit (squeeze) */
+.mh-body {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
 
 /* — powerline starship prompt (same as mish.music) — */
 .mh-bar {
+  flex: 0 0 auto;
   display: flex;
   justify-content: flex-start;
   align-items: center;
@@ -240,7 +290,7 @@ body.theme-light {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  margin: 0 0 var(--mh-gap, 16px);
+  margin: 0;
 }
 .mh-bar.is-empty { display: none; }
 
@@ -313,14 +363,13 @@ body.theme-light {
 .mh-hint.is-bad { color: var(--mh-t0); }
 
 /* — banner — */
-.mh-sec-banner .mh-body.is-centre { display: flex; justify-content: center; }
 .mh-banner {
   display: block;
-  width: min(100%, calc(var(--mh-bw, 40) * var(--mh-banner, 7px)));
-  height: auto;
+  width: 100%;
+  height: 100%;
 }
 .mh-btext {
-  font-size: calc(var(--mh-banner, 7px) * 5);
+  font-size: clamp(26px, 9cqi, 64px);
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
@@ -494,11 +543,6 @@ body.theme-light {
 .mh-setting-area .setting-item-control { width: 100%; }
 .mh-setting-area textarea { font-family: var(--font-monospace); font-size: 12px; }
 
-/* ═══ no scrolling: the page is scaled to fit by main.js (see fit()) ═══ */
-.mh-fit .mh-scroll { overflow-y: hidden; align-items: flex-start; }
-.mh-fit .mh-scroll.is-overflow { overflow-y: auto; }
-.mh-keep { text-transform: none; }
-
 /* ═══ colour classes used by the new sections and terminal output ═══ */
 .mh-t2 { color: var(--mh-t2); } .mh-t4 { color: var(--mh-t4); } .mh-t5 { color: var(--mh-t5); }
 .mh-dim { color: var(--mh-dim); } .mh-fg { color: var(--mh-fg); }
@@ -508,39 +552,6 @@ body.theme-light {
 .mh-pbar i.on.mh-lv-ok { background: var(--mh-f3); }
 .mh-pbar i.on.mh-lv-warn { background: var(--mh-f2); }
 .mh-pbar i.on.mh-lv-bad { background: var(--mh-f0); }
-
-/* — calendar — */
-.mh-calhead { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.mh-caltitle { color: var(--mh-t0); cursor: pointer; }
-.mh-calbtn { color: var(--mh-dim); cursor: pointer; padding: 0 5px; border-radius: 4px; }
-.mh-calbtn:hover { color: var(--mh-fg); background: var(--mh-hover); }
-.mh-cal {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  row-gap: 2px;
-  max-width: 24em;
-  text-align: center;
-}
-.mh-cal.has-wk { grid-template-columns: 3ch repeat(7, minmax(0, 1fr)); }
-.mh-calwd { color: var(--mh-dim); font-size: 0.9em; }
-.mh-calwk { color: var(--mh-dim); font-size: 0.85em; opacity: 0.6; }
-.mh-day { position: relative; line-height: 1.75; border-radius: 5px; cursor: pointer; }
-.mh-day:hover { background: var(--mh-hover); }
-.mh-day.is-out { color: var(--mh-dim); opacity: 0.4; }
-.mh-day.has-note { color: var(--mh-t3); }
-.mh-day.has-note::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 1px;
-  width: 3px;
-  height: 3px;
-  margin-left: -1.5px;
-  border-radius: 50%;
-  background: var(--mh-f3);
-}
-.mh-day.is-today { background: var(--mh-f0); color: var(--mh-ink); opacity: 1; }
-.mh-day.is-today::after { background: var(--mh-ink); }
 
 /* — focus timer — */
 .mh-fotop { display: flex; align-items: baseline; gap: 12px; }
@@ -728,51 +739,163 @@ body.theme-light {
 .mh-bg0 { background: var(--mh-f0); } .mh-bg1 { background: var(--mh-f1); } .mh-bg2 { background: var(--mh-f2); }
 .mh-bg3 { background: var(--mh-f3); } .mh-bg4 { background: var(--mh-f4); } .mh-bg5 { background: var(--mh-f5); }
 
-/* a margin does not survive at the end of a column, so full-width sections bring their own gap above them */
-.mh-sec.is-wide { margin-top: var(--mh-gap, 16px); }
-.mh-grid > .mh-sec:first-child { margin-top: 0; }
-.mh-day { line-height: 1.55; }
+/* ═══════════════════════════════════════════════════════════════════════
+   a plain caret
+   ═══════════════════════════════════════════════════════════════════════ */
 
-/* ═══ the terminal dock, the banner's right side, and a prompt that never shows a focus ring ═══ */
-.mh-left { min-width: 0; container-type: inline-size; container-name: mhl; }
-@container mhl (max-width: 1000px) { .mh-cols-3 .mh-grid { column-count: 2; } }
-@container mhl (max-width: 440px)  { .mh-grid { column-count: 1; } }
+/* — the caret: no pink block. the input's own thin caret, in the text colour — */
+.mh .mh-input {
+  caret-color: var(--mh-fg);
+  caret-shape: bar;
+}
+.mh .mh-caret,
+.mh-inwrap:not(.is-focus) .mh-caret { display: none !important; }
+.mh-inwrap.is-empty .mh-input { text-indent: 0; }
 
-.mh.has-dock { display: flex; align-items: stretch; gap: calc(var(--mh-gap, 14px) * 1.5); }
-.mh.has-dock > .mh-left { flex: 1 1 0; }
-.mh-dock { flex: 0 0 var(--mh-dock, 36%); min-width: 0; display: flex; }
-.mh-dock .mh-sec { flex: 1 1 auto; display: flex; flex-direction: column; width: 100%; margin: 0 !important; column-span: none; }
-.mh-dock .mh-sec > .mh-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
-.mh-dock .mh-term { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
-.mh-dock .mh-tout { flex: 1 1 0; height: auto; min-height: calc(var(--mh-termlines, 6) * 1.5em + 10px); }
-.mh-dock .mh-tprompt { margin-top: auto; }
-/* a narrow card puts the terminal underneath instead */
-@container mhc (max-width: 760px) {
-  .mh.has-dock { flex-direction: column; }
-  .mh-dock { flex: 0 0 auto; width: 100%; }
-  .mh-dock .mh-tout { flex: 0 0 auto; height: calc(var(--mh-termlines, 6) * 1.5em + 10px); min-height: 0; }
+/* ═══════════════════════════════════════════════════════════════════════
+   1.3 · the cards
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* — hero: the clock and the greeting — */
+.mh-sec-hero .mh-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: 24px;
+}
+.mh-hclock {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+.mh-hclock .mh-body { height: 100%; }
+.mh-hinfo {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* centred when there is room, pinned to the top (never cut off at the top) when there is not */
+.mh-hinfo::before,
+.mh-hinfo::after { content: ""; flex: 1 1 0; }
+.mh-hello { font-size: calc(21px * var(--mh-scale, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mh-hinfo > * { flex-shrink: 0; }
+.mh-hinfo::before, .mh-hinfo::after { flex-shrink: 1; }
+.mh-prog { margin-top: 6px; }
+@container mhsec (max-width: 540px) {
+  .mh-sec-hero .mh-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1.1fr); row-gap: 8px; }
+  .mh-sec-hero .mh-hello { font-size: calc(18px * var(--mh-scale, 1)); }
 }
 
-.mh-sec-banner .mh-body.has-side { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
-.mh-sec-banner .mh-body.has-side .mh-banner:first-child { flex: 0 1 auto; }
-.mh-bside { margin-left: auto; width: min(45%, calc(var(--mh-bw, 20) * var(--mh-banner, 6px) * 0.7)) !important; opacity: 0.9; }
+/* — weather — */
+.mh-sec-weather .mh-body { display: flex; flex-direction: column; gap: 10px; }
+.mh-wtop { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mh-wico { flex: 0 0 auto; width: 40px; height: 40px; display: block; }
+.mh-ico { display: block; width: 100%; height: 100%; }
+.mh-wtemp { flex: 0 0 auto; font-size: calc(34px * var(--mh-scale, 1)); line-height: 1; color: var(--mh-fg); }
+.mh-wtemp small { font-size: 0.36em; margin-left: 2px; color: var(--mh-dim); vertical-align: top; position: relative; top: 0.35em; }
+.mh-wside { min-width: 0; display: flex; flex-direction: column; }
+.mh-wdesc, .mh-wplace { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-wplace { color: var(--mh-dim); }
+.mh-wrest { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+.mh-wrow { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 0 1.6ch; }
+.mh-wbit { white-space: nowrap; }
+.mh-wspark { flex: 0 0 auto; margin-top: auto; }
+.mh-spark { display: block; width: 100%; height: 30px; overflow: visible; }
+.mh-wlab { display: flex; justify-content: space-between; color: var(--mh-dim); font-size: 0.85em; margin-top: 2px; }
 
-/* obsidian and themes draw a focus ring on every input. the prompt is not a form field. */
-.mh .mh-line .mh-inwrap > input.mh-input,
-.mh .mh-line .mh-inwrap > input.mh-input:hover,
-.mh .mh-line .mh-inwrap > input.mh-input:focus,
-.mh .mh-line .mh-inwrap > input.mh-input:focus-visible,
-.mh .mh-line .mh-inwrap > input.mh-input:active {
-  border: 0 !important;
-  border-radius: 0 !important;
-  outline: 0 !important;
-  outline-offset: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  -webkit-appearance: none;
-  appearance: none;
-  height: auto !important;
-  padding: 0 !important;
-  margin: 0 !important;
+/* — todo — */
+.mh-sec-todo .mh-body { display: flex; flex-direction: column; gap: 8px; }
+.mh-tlist { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.mh-todo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 1ch;
+  min-height: 24px;
+  padding: 2px 6px;
+  margin: 0 -6px;
+  border-radius: 6px;
+  cursor: pointer;
 }
+.mh-todo:hover { background: var(--mh-hover); }
+.mh-todo .mh-ttext { cursor: inherit; }
+.mh-todo:hover .mh-ttext { color: inherit; }
+.mh-todo.is-done .mh-ttext { text-decoration: line-through; opacity: 0.5; }
+.mh-todo.is-done .mh-box { color: var(--mh-dim); }
+.mh-tdel { flex: 0 0 auto; padding: 0 4px; color: var(--mh-dim); opacity: 0; cursor: pointer; }
+.mh-todo:hover .mh-tdel { opacity: 1; }
+.mh-tdel:hover { color: var(--mh-t0); }
+.mh-tadd { flex: 0 0 auto; display: flex; align-items: center; gap: 1ch; padding-top: 8px; border-top: 1px solid var(--mh-rule); }
+.mh .mh-tin {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  color: var(--mh-fg);
+  font: inherit;
+  caret-color: var(--mh-fg);
+}
+.mh .mh-tin:focus { box-shadow: none; border: 0; }
+.mh .mh-tin::placeholder { color: var(--mh-dim); opacity: 0.75; }
+.mh-tclear { flex: 0 0 auto; color: var(--mh-dim); cursor: pointer; font-size: 0.92em; }
+.mh-tclear:hover { color: var(--mh-t0); }
+
+/* — countdown — */
+.mh-sec-countdown .mh-body { display: flex; flex-direction: column; gap: 10px; }
+.mh-cdtop { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mh-cdnum { flex: 0 0 auto; font-size: calc(38px * var(--mh-scale, 1)); line-height: 1; }
+.mh-cdside { min-width: 0; display: flex; flex-direction: column; }
+.mh-cdunit { color: var(--mh-dim); }
+.mh-cdlabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-cdlist { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.mh-cdlist:empty { display: none; }
+.mh-cdrow { flex: 0 0 auto; display: flex; align-items: baseline; gap: 1.2ch; min-height: 22px; }
+.mh-cdd { flex: 0 0 5ch; text-align: right; }
+.mh-cdl { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-cdw { flex: 0 0 auto; color: var(--mh-dim); }
+.mh-hint.is-code { color: var(--mh-t3); }
+
+/* — focus — */
+.mh-sec-focus .mh-body { display: flex; flex-direction: column; }
+.mh-sec-focus .mh-body::before,
+.mh-sec-focus .mh-body::after { content: ""; flex: 1 1 0; }
+.mh-sec-focus .mh-body > * { flex: 0 0 auto; }
+.mh-fotime { font-size: calc(34px * var(--mh-scale, 1)); line-height: 1.1; }
+.mh-fobar { margin: 10px 0; flex: 0 0 auto; }
+.mh-fobtns { margin-top: 2px; }
+
+/* — system: a row is a label and a bar; the row wrapper steps aside so the grid still lines up — */
+.mh-sys { row-gap: 7px; }
+.mh-srow { display: contents; }
+
+/* — shortcuts and lists: one row a line, a little air — */
+.mh-sec-shortcuts .mh-sc { min-height: 24px; }
+
+/* — the terminal: fills its pane — */
+.mh-sec-shell { padding: 0; }
+.mh-frame-soft .mh-sec-shell,
+.mh-frame-flat .mh-sec-shell { background: none; border: 0; }
+.mh-frame-ring .mh-term { border: 0; background: none; }
+.mh-sec-shell .mh-body { display: flex; flex-direction: column; }
+.mh-sec-shell .mh-term { flex: 1 1 0; min-height: 0; height: 100%; display: flex; flex-direction: column; }
+.mh-sec-shell .mh-tbar,
+.mh-sec-shell .mh-menu,
+.mh-sec-shell .mh-tprompt { flex: 0 0 auto; }
+.mh-sec-shell .mh-tout {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+.mh-sec-shell .mh-tout > * { flex: 0 0 auto; }
+/* output stacks up from the prompt, so the welcome line sits right above where you type */
+.mh-sec-shell .mh-tout > :first-child { margin-top: auto; }

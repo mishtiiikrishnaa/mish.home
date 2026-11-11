@@ -2,34 +2,41 @@
 
 /* ═══════════════════════════════════════════════════════════════════════
    mish.home
-   a terminal-style home page for obsidian. one tab you open the app to:
-   a starship prompt, big block letters, a greeting, shortcuts, recent notes
-   as an eza tree, open todos, a contribution-style streak grid, vault stats
-   in the fastfetch style, and a little shell you can type into.
-   dressed like mish.eza and mish.music: same prompt, same rainbow ring,
-   same palette variables, same bundled font.
+   the page obsidian opens to. a fixed-size dashboard that never scrolls: a big
+   block-letter clock, a greeting, the weather, a todo list, countdowns, a focus
+   timer, system stats, shortcuts and a little terminal you can type into.
 
-   every section can be switched on or off, moved up or down, and made full
-   or half width. nearly everything about how it looks is a setting: the six
-   rainbow colours (with presets), pill text colour, pill shape, border,
-   corner radius, margins, card layout, text size and font.
+   everything on it is about you and not about a vault, so every vault shows the
+   same page. the todo list, the countdowns, the weather place and the settings
+   live in one small file in your home folder (~/.mish-home/shared.json).
+   notes-based sections (recent, streak, vault tasks, tags ...) are still here,
+   switched off, if you want them back.
 
-   it is not a real shell: the words are mapped onto obsidian's own api.
-   nothing is ever sent to the operating system, and nothing is run.
+   dressed like mish.eza and mish.music: same prompt, same rainbow, same palette
+   variables, same bundled font.
+
+   the terminal is not a real shell: the words are mapped onto obsidian's own
+   api. nothing is ever sent to the operating system, and nothing is run.
    ═══════════════════════════════════════════════════════════════════════ */
 
 const obsidian = require('obsidian');
 const {
   Plugin, ItemView, PluginSettingTab, Setting, Notice, TFile, TFolder, Platform, Keymap,
-  FuzzySuggestModal, normalizePath, moment,
+  FuzzySuggestModal, normalizePath, moment, requestUrl,
 } = obsidian;
 
 /* node's `os` module is how the prompt finds your username and the machine's name.
    it only exists on desktop, which is why the manifest says isDesktopOnly. */
 let nodeOs = null;
 try { nodeOs = require('os'); } catch (e) { nodeOs = null; }
+/* fs and path are how the shared file in your home folder is read and written (desktop only) */
+let nodeFs = null;
+let nodePath = null;
+try { nodeFs = require('fs'); nodePath = require('path'); } catch (e) { nodeFs = null; nodePath = null; }
 
 const VIEW_TYPE = 'mh-home-view';
+const MIN_CARD_W = 236;       /* the narrowest a card gets before the page drops a column */
+const MIN_CARD_H = 150;       /* the shortest a card gets before the page drops a row */
 const PLUGIN_ID = 'mish-home';
 const SHAPES = ['arrow', 'round', 'flat'];
 const RINGS = ['rainbow', 'accent', 'subtle', 'none'];
@@ -138,26 +145,27 @@ class UiSetting extends Setting {
 }
 
 /* ── the sections ────────────────────────────────────────────────────────
-   order, on/off and full/half width of each one are settings. `wide` only matters
-   in the two-column layout. */
+   order and on/off for each one are settings. the order is also the priority: in a small tab
+   the cards at the top are kept and the ones at the bottom are left out. */
 const SECTION_META = {
-  banner:    { label: 'banner',      wide: true,  on: true,  desc: 'big block letters: the vault name, your name, the time or any text.' },
-  greeting:  { label: 'greeting',    wide: false, on: true,  desc: 'a hello, the date, a one-line summary and progress bars for the day, week, month and year.' },
-  shortcuts: { label: 'shortcuts',   wide: false, on: true,  desc: 'commands you can click, with their hotkeys: new note, go to file, anything in the command palette.' },
-  calendar:  { label: 'calendar',    wide: false, on: true,  desc: 'this month, like the cal command. days you wrote on are marked. click a day to open its daily note.' },
-  tasks:     { label: 'todo',        wide: false, on: true,  desc: 'open checkboxes from across the vault. click a box to tick it.' },
-  recent:    { label: 'recent',      wide: false, on: true,  desc: 'the notes you opened or edited last, as an eza-style tree.' },
-  system:    { label: 'system',      wide: false, on: true,  desc: 'cpu, memory, battery and uptime, btop-style. updates live.' },
-  pinned:    { label: 'pinned',      wide: false, on: false, desc: 'notes you pin by name, plus your bookmarks.' },
-  focus:     { label: 'focus timer', wide: false, on: false, desc: 'a pomodoro timer: focus, break, repeat. it keeps running when you leave the tab.' },
-  links:     { label: 'links',       wide: false, on: false, desc: 'web links you open often. they open in your browser.' },
-  tags:      { label: 'tags',        wide: false, on: false, desc: 'your most used tags, with bars.' },
-  folders:   { label: 'folders',     wide: false, on: false, desc: 'where your notes live: the biggest folders, du-style.' },
-  random:    { label: 'random note', wide: false, on: false, desc: 'a peek at one note, a new one each day, like cat on a random file.' },
-  git:       { label: 'git log',     wide: false, on: false, desc: 'the latest commits, when the vault is a git repository.' },
-  streak:    { label: 'streak',      wide: true,  on: true,  desc: 'a contribution-style grid of the days you wrote, with your current streak.' },
-  quote:     { label: 'fortune',     wide: false, on: false, desc: 'one line from your own list, a new one each day.' },
-  shell:     { label: 'terminal',    wide: true,  on: true,  desc: 'a terminal window you can type into: open and search notes, add to your inbox, run a timer, and more. type help.' },
+  hero:      { label: 'clock and greeting', on: true,  desc: 'a big block-letter clock, a hello, the date and progress bars for the day, week, month and year.' },
+  todo:      { label: 'todo',        on: true,  desc: 'your own todo list: type to add, click to tick, x to remove. it is kept in your home folder, so every vault shows the same list.' },
+  weather:   { label: 'weather',     on: true,  desc: 'the weather where you are: now, today and the next few hours. from open-meteo, no account needed.' },
+  focus:     { label: 'focus timer', on: true,  desc: 'a pomodoro timer: focus, break, repeat. it keeps running when you leave the tab.' },
+  countdown: { label: 'countdown',   on: true,  desc: 'days left until the things you are waiting for: exams, deadlines, trips. kept in your home folder, like the todo list.' },
+  system:    { label: 'system',      on: true,  desc: 'cpu, memory, battery and uptime, btop-style. updates live.' },
+  shortcuts: { label: 'shortcuts',   on: true,  desc: 'commands you can click, with their hotkeys: new note, go to file, anything in the command palette.' },
+  links:     { label: 'links',       on: false, desc: 'web links you open often. they open in your browser.' },
+  recent:    { label: 'recent notes', on: false, desc: 'the notes you opened or edited last in this vault, as an eza-style tree.' },
+  tasks:     { label: 'vault tasks', on: false, desc: 'open checkboxes from the notes in this vault. click a box to tick it.' },
+  pinned:    { label: 'pinned',      on: false, desc: 'notes you pin by name, plus your bookmarks.' },
+  tags:      { label: 'tags',        on: false, desc: 'the most used tags in this vault, with bars.' },
+  folders:   { label: 'folders',     on: false, desc: 'where the notes in this vault live: the biggest folders, du-style.' },
+  random:    { label: 'random note', on: false, desc: 'a peek at one note from this vault, a new one each day, like cat on a random file.' },
+  git:       { label: 'git log',     on: false, desc: 'the latest commits, when the vault is a git repository.' },
+  streak:    { label: 'streak',      on: false, desc: 'a contribution-style grid of the days you wrote in this vault, with your current streak.' },
+  quote:     { label: 'fortune',     on: false, desc: 'one line from your own list, a new one each day.' },
+  shell:     { label: 'terminal',    on: true,  desc: 'a terminal you can type into: open and search notes, keep a todo list and countdowns, run a timer, check the weather, and more. type help. it sits in a tall pane on the right when there is room.' },
 };
 const SECTION_IDS = Object.keys(SECTION_META);
 
@@ -168,6 +176,7 @@ const DEFAULT_SHORTCUTS = [
   'search | global-search:open',
   'graph view | graph:open',
   'command palette | command-palette:open',
+  'switch vault | app:open-vault',
 ].join('\n');
 
 const DEFAULT_QUOTES = [
@@ -186,7 +195,14 @@ const DEFAULT_LINKS = [
   'mail | https://mail.google.com',
 ].join('\n');
 
+/* the next new year: the one countdown that is true for everybody, so the card is never empty at first */
+const defaultCountdowns = () => 'new year | ' + (new Date().getFullYear() + 1) + '-01-01';
+
+/* settings that belong to a vault and are never shared between vaults */
+const LOCAL_ONLY = ['exclude', 'daily', 'pathLabel', 'shareSettings'];
+
 const DEFAULT_SETTINGS = {
+  shareSettings: true,      /* every vault uses the same settings, kept in ~/.mish-home/shared.json */
   lowercaseUi: true,        /* settings text in lowercase (true) or sentence case (false) */
   lowercaseText: true,      /* the home page itself in lowercase, note names included (display only) */
   username: '',             /* empty = auto-detect */
@@ -210,25 +226,28 @@ const DEFAULT_SETTINGS = {
   inkColour: '',            /* text on the pills. empty = automatic (dark ink) */
 
   /* the prompt */
-  pills: { user: true, path: true, git: true, time: true },
+  pills: { user: true, path: true, git: true, time: false },
   pillShape: 'arrow',       /* arrow | round | flat */
   pathLabel: '',            /* empty = ~/<vault name> */
   clock: { hour12: false, seconds: false },
   showCommands: true,       /* the ❯ line above each section */
 
-  sections: SECTION_IDS.map((id) => ({ id, on: SECTION_META[id].on, wide: SECTION_META[id].wide })),
+  sections: SECTION_IDS.map((id) => ({ id, on: SECTION_META[id].on })),
 
-  banner: { source: 'vault', custom: '', style: 'blocks', letters: 'lower', size: 6, gradient: 'rainbow', align: 'left', side: 'clock' },   /* side: clock | date | none (right of the letters) */
+  /* the clock in the first card. source 'time' is the big clock; 'vault' and 'name' are still there */
+  banner: { source: 'time', custom: '', style: 'blocks', letters: 'lower', gradient: 'rainbow', align: 'left' },
 
   greeting: {
-    summary: true,
+    summary: false,         /* notes, links and streak: about one vault, so off */
     template: '{greeting}, {name}.',
     showDate: true,
     dateFormat: 'dddd · D MMMM YYYY',
-    progress: { day: false, week: false, month: false, year: true },
+    progress: { day: true, week: true, month: true, year: true },
     barWidth: 24,
-    barHeight: 9,
+    barHeight: 8,
   },
+
+  weather: { place: '', unit: 'auto', hourly: true, details: true },
 
   shortcuts: { items: DEFAULT_SHORTCUTS, layout: 'list', colour: 'plain', hotkeys: true, hideMissing: true },
 
@@ -242,7 +261,6 @@ const DEFAULT_SETTINGS = {
 
   quote: { lines: DEFAULT_QUOTES, mode: 'daily' },
 
-  calendar: { mark: 'activity', weekNumbers: false, arrows: true },
   focus: { focusMin: 25, breakMin: 5, longBreakMin: 15, longEvery: 4, autoNext: false, notify: true },
   links: { items: DEFAULT_LINKS, layout: 'list', colour: 'plain' },
   tags: { count: 8 },
@@ -254,23 +272,24 @@ const DEFAULT_SETTINGS = {
     style: 'window',                       /* window | plain */
     titleBar: true,
     title: '{user}@{host}: {path}',
-    position: 'right',                     /* right = a tall pane beside the sections | bottom = full width underneath */
-    dockWidth: 36,                         /* percent of the page, in right mode */
-    height: 6,                             /* lines of scrollback (at least this many; in right mode it grows to the height of the page) */
+    height: 4,                             /* lines of scrollback */
     prompt: 'powerline',                   /* powerline | compact */
     rprompt: true,                         /* the time on the right of the prompt */
     suggest: true,                         /* grey autosuggestions from your history (press → to accept) */
     welcome: true,
+    startup: '',                           /* commands run once when obsidian opens the pane. comma separated, empty = none */
     placeholder: 'type a command · help',
-    capture: 'daily',                      /* daily | inbox: where "add" and "todo add" write */
+    capture: 'daily',                      /* daily | inbox: where "add" and "tasks add" write */
     inbox: 'inbox.md',
   },
 
   daily: { folder: '', format: '' },    /* empty = whatever the core daily notes plugin says, else the vault root and YYYY-MM-DD */
 
   /* the card */
-  layout: { frame: 'one', columns: 3, width: 1100, gap: 14, inner: 14, fit: 'shrink', minScale: 55 },   /* frame: one | each | none. fit: shrink | scroll */
-  card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 12, pad: 16, textSize: 100 },
+  /* the page is a grid that fills the tab and never scrolls. columns = the most cards side by side.
+     frame: soft (a quiet box around each card) | ring (a rainbow ring around each) | flat (no boxes) */
+  layout: { frame: 'soft', columns: 4, gap: 12, inner: 14, sideWidth: 440 },
+  card: { ring: 'rainbow', ringWidth: 1, angle: 135, radius: 14, pad: 14, textSize: 100 },
 };
 
 /* a data.json from an older version, or one edited by hand, must never break the page */
@@ -282,6 +301,7 @@ const sanitise = (cfg) => {
   }
   delete cfg.fetch;      /* the fastfetch section was removed */
   delete cfg.shell;      /* replaced by cfg.terminal */
+  delete cfg.calendar;   /* so was the calendar */
   cfg.lowercaseUi = cfg.lowercaseUi !== false;
   cfg.lowercaseText = cfg.lowercaseText !== false;
   cfg.startup = oneOf(cfg.startup, ['always', 'empty', 'never'], 'always');
@@ -295,11 +315,11 @@ const sanitise = (cfg) => {
   for (const it of Array.isArray(cfg.sections) ? cfg.sections : []) {
     if (it && SECTION_META[it.id] && !seen.has(it.id)) {
       seen.add(it.id);
-      list.push({ id: it.id, on: it.on !== false, wide: it.wide === undefined ? SECTION_META[it.id].wide : !!it.wide });
+      list.push({ id: it.id, on: it.on !== false });
     }
   }
   for (const id of SECTION_IDS) {
-    if (!seen.has(id)) list.push({ id, on: SECTION_META[id].on, wide: SECTION_META[id].wide });
+    if (!seen.has(id)) list.push({ id, on: SECTION_META[id].on });
   }
   cfg.sections = list;
 
@@ -309,12 +329,17 @@ const sanitise = (cfg) => {
   b.gradient = oneOf(b.gradient, ['rainbow', 'accent', 'pink', 'plain'], 'rainbow');
   b.align = oneOf(b.align, ['left', 'centre'], 'left');
   b.letters = oneOf(b.letters, ['lower', 'caps'], 'lower');
-  b.side = oneOf(b.side, ['clock', 'date', 'none'], 'clock');
-  b.size = num(b.size, 3, 14, 6);
+  delete b.size;         /* the clock now sizes itself to its card */
 
   const g = cfg.greeting;
   g.barWidth = num(g.barWidth, 8, 40, 24);
   g.barHeight = num(g.barHeight, 4, 14, 9);
+
+  const wx = cfg.weather;
+  wx.place = String(wx.place || '').trim();
+  wx.unit = oneOf(wx.unit, ['auto', 'c', 'f'], 'auto');
+  wx.hourly = wx.hourly !== false;
+  wx.details = wx.details !== false;
 
   cfg.shortcuts.layout = oneOf(cfg.shortcuts.layout, ['list', 'row'], 'list');
   cfg.shortcuts.colour = oneOf(cfg.shortcuts.colour, ['plain', 'rainbow'], 'plain');
@@ -344,8 +369,7 @@ const sanitise = (cfg) => {
 
   cfg.quote.mode = oneOf(cfg.quote.mode, ['daily', 'random'], 'daily');
 
-  cfg.greeting.summary = cfg.greeting.summary !== false;
-  cfg.calendar.mark = oneOf(cfg.calendar.mark, ['activity', 'daily', 'none'], 'activity');
+  cfg.greeting.summary = cfg.greeting.summary === true;
   const fo = cfg.focus;
   fo.focusMin = num(fo.focusMin, 1, 180, 25);
   fo.breakMin = num(fo.breakMin, 1, 60, 5);
@@ -365,24 +389,21 @@ const sanitise = (cfg) => {
   tm.style = oneOf(tm.style, ['window', 'plain'], 'window');
   tm.prompt = oneOf(tm.prompt, ['powerline', 'compact'], 'powerline');
   tm.capture = oneOf(tm.capture, ['daily', 'inbox'], 'daily');
-  tm.height = num(tm.height, 2, 30, 6);
-  tm.position = oneOf(tm.position, ['right', 'bottom'], 'right');
-  tm.dockWidth = num(tm.dockWidth, 22, 55, 36);
+  tm.height = num(tm.height, 2, 20, 4);
   if (typeof tm.inbox !== 'string' || !tm.inbox.trim()) tm.inbox = 'inbox.md';
+  if (typeof tm.startup !== 'string') tm.startup = 'stats, help';
 
   const l = cfg.layout;
-  l.frame = oneOf(l.frame, ['one', 'each', 'none'], 'one');
-  l.columns = oneOf(Number(l.columns), [1, 2, 3], 2);
-  l.width = num(l.width, 420, 1400, 1100);
-  l.gap = num(l.gap, 0, 40, 14);
-  l.inner = num(l.inner, 0, 40, 14);
-  l.fit = oneOf(l.fit, ['shrink', 'scroll'], 'shrink');
-  l.minScale = num(l.minScale, 30, 100, 55);
+  l.frame = oneOf(l.frame, ['soft', 'ring', 'flat'], 'soft');
+  l.columns = oneOf(Number(l.columns), [1, 2, 3, 4], 4);
+  l.gap = num(l.gap, 0, 40, 12);
+  l.inner = num(l.inner, 4, 40, 14);
+  l.sideWidth = num(l.sideWidth, 260, 700, 440);
+  for (const k of ['width', 'fit', 'minScale', 'split', 'scaleV2']) delete l[k];   /* the old flowing, shrinking layout */
 
   const c = cfg.card;
   c.ring = oneOf(c.ring, RINGS, 'rainbow');
-  c.hAlign = oneOf(c.hAlign, ['centre', 'left'], 'centre');
-  c.vAlign = oneOf(c.vAlign, ['centre', 'top'], 'centre');
+  for (const k of ['hAlign', 'vAlign']) delete c[k];
   return cfg;
 };
 
@@ -420,17 +441,12 @@ const layoutVars = (cfg) => {
   const c = cfg.card;
   const l = cfg.layout;
   const v = {
-    '--mh-w': l.width + 'px',
-    '--mh-cols': String(l.columns),
     '--mh-gap': l.gap + 'px',
     '--mh-inner': l.inner + 'px',
-    '--mh-radius': num(c.radius, 0, 28, 12) + 'px',
-    '--mh-pad': num(c.pad, 0, 48, 16) + 'px',
+    '--mh-radius': num(c.radius, 0, 28, 14) + 'px',
+    '--mh-pad': num(c.pad, 0, 48, 14) + 'px',
     '--mh-angle': num(c.angle, 0, 360, 135) + 'deg',
     '--mh-scale': String(num(c.textSize, 80, 140, 100) / 100),
-    '--mh-mt': c.vAlign === 'top' ? '0' : 'auto',
-    '--mh-ml': c.hAlign === 'left' ? '0' : 'auto',
-    '--mh-banner': cfg.banner.size + 'px',
     '--mh-seek': cfg.greeting.barHeight + 'px',
     '--mh-cell': cfg.streak.cell + 'px',
     '--mh-cgap': cfg.streak.gap + 'px',
@@ -722,10 +738,9 @@ const bannerSvg = (text, uid, gradient, letters) => {
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
   svg.setAttribute('class', 'mh-banner');
   svg.setAttribute('shape-rendering', 'crispEdges');
+  svg.setAttribute('preserveAspectRatio', 'xMinYMid meet');
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', text);
-  svg.style.setProperty('--mh-bw', String(W));
-  svg.style.aspectRatio = W + ' / ' + H;
 
   const id = 'mh-grad-' + uid;
   const defs = document.createElementNS(SVG_NS, 'defs');
@@ -807,6 +822,150 @@ const toLines = (out) => {
 /* ═══════════════════════════════════════════════════════════════════════
    the plugin
    ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   the shared file
+   what this page shows is about you, not about a vault, so the todo list, the
+   countdowns, the weather place and the settings live in one small file in your
+   home folder. every vault that has this plugin reads the same file.
+   ══════════════════════════════════════════════════════════════════════ */
+const stable = (v) => {
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (isPlain(v)) return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  return JSON.stringify(v);
+};
+
+class SharedStore {
+  constructor() {
+    this.file = null;
+    this.dir = null;
+    this.mtime = 0;
+    try {
+      if (nodeFs && nodePath && nodeOs) {
+        this.dir = nodePath.join(nodeOs.homedir(), '.mish-home');
+        this.file = nodePath.join(this.dir, 'shared.json');
+      }
+    } catch (e) { this.file = null; }
+  }
+
+  get ok() { return Boolean(this.file); }
+
+  /* the parsed file, or null when there is none (or it cannot be read) */
+  read() {
+    if (!this.ok) return null;
+    try {
+      const st = nodeFs.statSync(this.file);
+      const raw = JSON.parse(nodeFs.readFileSync(this.file, 'utf8'));
+      this.mtime = st.mtimeMs;
+      return isPlain(raw) ? raw : null;
+    } catch (e) { return null; }
+  }
+
+  /* has another window written to it since we last looked? */
+  changed() {
+    if (!this.ok) return false;
+    try { return nodeFs.statSync(this.file).mtimeMs !== this.mtime; } catch (e) { return false; }
+  }
+
+  /* writes only the keys given, on top of what is in the file right now, so two windows never wipe each other out */
+  write(patch) {
+    if (!this.ok) return false;
+    try {
+      const cur = this.read() || {};
+      const next = Object.assign({}, cur, patch);
+      if (!nodeFs.existsSync(this.dir)) nodeFs.mkdirSync(this.dir, { recursive: true });
+      const tmp = this.file + '.' + Date.now() + '.tmp';
+      nodeFs.writeFileSync(tmp, JSON.stringify(next, null, 2));
+      nodeFs.renameSync(tmp, this.file);
+      this.mtime = nodeFs.statSync(this.file).mtimeMs;
+      return true;
+    } catch (e) {
+      console.error('mish.home: could not write the shared file', e);
+      return false;
+    }
+  }
+}
+
+/* the settings that are shared: everything except the few that belong to one vault */
+const shareable = (settings) => {
+  const out = clone(settings);
+  for (const k of LOCAL_ONLY) delete out[k];
+  return out;
+};
+
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+const cleanTodos = (list) => {
+  const cut = Date.now() - 24 * 3600000;       /* ticked items stay for a day, then go */
+  return (Array.isArray(list) ? list : [])
+    .filter((t) => t && typeof t.text === 'string' && t.text.trim())
+    .map((t) => ({
+      id: String(t.id || newId()),
+      text: t.text.trim().slice(0, 300),
+      done: Boolean(t.done),
+      at: Number(t.at) || 0,
+      doneAt: Number(t.doneAt) || 0,
+    }))
+    .filter((t) => !(t.done && t.doneAt && t.doneAt < cut))
+    .slice(0, 300);
+};
+
+/* "label | 2026-12-01", one per line. several date styles are understood */
+const DATE_FORMATS = ['YYYY-MM-DD', 'D MMM YYYY', 'D MMMM YYYY', 'DD/MM/YYYY', 'D/M/YYYY', 'MMM D YYYY', 'MMMM D YYYY'];
+const parseDate = (text) => {
+  const m = moment(String(text).trim(), DATE_FORMATS, true);
+  return m.isValid() ? m.startOf('day') : null;
+};
+const parseCountdowns = (text) => String(text || '')
+  .split('\n')
+  .map((line) => line.trim())
+  .filter((line) => line && line[0] !== '#')
+  .map((line) => {
+    const at = line.lastIndexOf('|');
+    if (at < 0) return null;
+    const when = parseDate(line.slice(at + 1));
+    const label = line.slice(0, at).trim();
+    return when && label ? { label, when } : null;
+  })
+  .filter(Boolean);
+
+/* ── weather ─────────────────────────────────────────────────────────────
+   open-meteo needs no account or key. the words and icons for each weather code */
+const WMO = {
+  0: ['clear', 'sun'], 1: ['mostly clear', 'sun'], 2: ['partly cloudy', 'partly'], 3: ['overcast', 'cloud'],
+  45: ['fog', 'fog'], 48: ['freezing fog', 'fog'],
+  51: ['light drizzle', 'rain'], 53: ['drizzle', 'rain'], 55: ['heavy drizzle', 'rain'], 56: ['freezing drizzle', 'rain'], 57: ['freezing drizzle', 'rain'],
+  61: ['light rain', 'rain'], 63: ['rain', 'rain'], 65: ['heavy rain', 'rain'], 66: ['freezing rain', 'rain'], 67: ['freezing rain', 'rain'],
+  71: ['light snow', 'snow'], 73: ['snow', 'snow'], 75: ['heavy snow', 'snow'], 77: ['snow grains', 'snow'],
+  80: ['light showers', 'rain'], 81: ['showers', 'rain'], 82: ['heavy showers', 'rain'], 85: ['snow showers', 'snow'], 86: ['heavy snow showers', 'snow'],
+  95: ['thunderstorm', 'storm'], 96: ['thunderstorm, hail', 'storm'], 99: ['thunderstorm, hail', 'storm'],
+};
+const wmo = (code) => WMO[code] || ['weather', 'cloud'];
+
+/* little line icons, 24 x 24, drawn in the current text colour */
+const ICON_PATHS = {
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  partly: '<path d="M12 2v2M4.93 4.93l1.41 1.41M20 12h2M19.07 4.93l-1.41 1.41"/><path d="M15.95 12.65a4 4 0 0 0-5.93-4.13"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>',
+  rain: '<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M16 14v6M8 14v6M12 16v6"/>',
+  snow: '<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>',
+  storm: '<path d="M6 16.33A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.97"/><path d="m13 12-3 5h4l-3 5"/>',
+  fog: '<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M16 17H7M17 21H9"/>',
+};
+const iconEl = (name, cls) => {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'mh-ico' + (cls ? ' ' + cls : ''));
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.6');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = ICON_PATHS[name] || ICON_PATHS.cloud;
+  return svg;
+};
+
 class MishHome extends Plugin {
   async onload() {
     this.views = new Set();
@@ -818,20 +977,41 @@ class MishHome extends Plugin {
     this.detected = detectIdentity();
     this.statsCache = null;
 
-    /* data.json holds the settings, recently opened notes, the edit log and the shell history */
+    /* data.json holds this vault's own things: recently opened notes, the edit log, the shell history.
+       the settings, todos and countdowns are shared between vaults through ~/.mish-home/shared.json,
+       and also copied here, so nothing is lost if that file is ever missing. */
     const saved = (await this.loadData()) || {};
-    this.settings = sanitise(deepMerge(clone(DEFAULT_SETTINGS), saved.settings || {}));
+    this.store = new SharedStore();
+    const shared = this.store.read();
+    const local = isPlain(saved.settings) ? saved.settings : {};
+    const useShared = local.shareSettings !== false;
+    const adopt = Boolean(useShared && shared && isPlain(shared.settings));
+    let merged = deepMerge(clone(DEFAULT_SETTINGS), local);
+    if (adopt) merged = deepMerge(merged, shareable(shared.settings));
+    this.settings = sanitise(merged);
     uiCase.lower = this.settings.lowercaseUi;
-    /* older versions saved an older section list; the new default (calendar, system, terminal, no fastfetch) applies once */
-    if ((saved.v || 0) < 3) {
+    /* a page from an older version: the new dashboard defaults apply once. a settings file that another
+       vault already wrote with this version is taken as it is. */
+    if ((saved.v || 0) < 4 && !adopt) {
       const d = DEFAULT_SETTINGS;
-      this.settings.sections = clone(d.sections);
-      this.settings.layout = clone(d.layout);                 /* three columns, shrink to fit */
-      this.settings.banner.size = d.banner.size;
-      this.settings.streak.cell = d.streak.cell;
-      this.settings.streak.gap = d.streak.gap;
+      const s = this.settings;
+      s.sections = clone(d.sections);
+      s.layout = clone(d.layout);
+      s.card = clone(d.card);
+      s.banner = clone(d.banner);
+      s.greeting = clone(d.greeting);
+      s.pills.time = d.pills.time;
+      if (s.terminal.startup === 'stats, help') s.terminal.startup = '';
+      sanitise(s);
     }
-    if ((saved.v || 0) < 4) this.settings.terminal.height = DEFAULT_SETTINGS.terminal.height;      /* the terminal got taller */
+    const gsrc = shared && Array.isArray(shared.todos) ? shared : saved;
+    this.glob = {
+      todos: cleanTodos(gsrc.todos),
+      countdowns: typeof gsrc.countdowns === 'string' ? gsrc.countdowns : defaultCountdowns(),
+      wx: isPlain(gsrc.wx) ? gsrc.wx : null,
+    };
+    this.settingsDirty = false;
+    if (useShared && this.store.ok && !adopt) this.store.write({ v: 4, settings: shareable(this.settings) });
     this.opened = Array.isArray(saved.opened) ? saved.opened.filter((p) => typeof p === 'string').slice(0, 60) : [];
     this.history = Array.isArray(saved.history) ? saved.history.filter((p) => typeof p === 'string').slice(-60) : [];
     this.activity = {};
@@ -864,6 +1044,15 @@ class MishHome extends Plugin {
 
     this.addCommand({ id: 'open-home', name: 'Open home', callback: () => this.openHome() });
     this.addCommand({ id: 'daily-note', name: "Open today's daily note", callback: () => this.openDaily() });
+    this.addCommand({
+      id: 'add-todo',
+      name: 'Add a todo',
+      callback: async () => {
+        const leaf = await this.openHome();
+        const view = leaf && leaf.view;
+        if (view && view.focusTodo) window.setTimeout(() => view.focusTodo(), 60);
+      },
+    });
     this.addCommand({ id: 'random-note', name: 'Open a random note', callback: () => this.openRandom() });
     this.addCommand({
       id: 'focus-prompt',
@@ -913,7 +1102,7 @@ class MishHome extends Plugin {
     this.registerEvent(vault.on('modify', (file) => {
       this.trackEdit(file);
       this.statsCache = null;
-      this.refreshSoon(['recent', 'streak', 'calendar', 'tags', 'folders'], 2500);
+      this.refreshSoon(['recent', 'streak', 'tags', 'folders'], 2500);
     }));
     this.registerEvent(this.app.metadataCache.on('changed', () => this.refreshSoon(['tasks', 'tags', 'folders'], 1500)));
 
@@ -923,6 +1112,7 @@ class MishHome extends Plugin {
       beat++;
       this.focusTick();
       if (beat % 60 === 0) this.refreshBattery();
+      if (beat % 3 === 0) this.syncShared();
       for (const view of this.views) view.tick();
     }, 1000));
   }
@@ -930,6 +1120,9 @@ class MishHome extends Plugin {
   onunload() {
     window.clearTimeout(this.refreshTimer);
     window.clearTimeout(this.saveTimer);
+    window.clearTimeout(this.settingsTimer);
+    if (this.globTimer) this.flushGlob();
+    if (this.settingsDirty) this.shareSettings();
     this.saveAll();
     /* open home tabs are left alone: obsidian turns them back into the page when the plugin returns */
   }
@@ -1113,7 +1306,7 @@ class MishHome extends Plugin {
     return file;
   }
 
-  /* "add" and "todo add" in the terminal: a line at the end of today's daily note, or your inbox note */
+  /* "add" and "tasks add" in the terminal: a line at the end of today's daily note, or your inbox note */
   async capture(text, kind) {
     const t = this.settings.terminal;
     let file;
@@ -1474,6 +1667,215 @@ class MishHome extends Plugin {
     window.open(u, '_blank');
   }
 
+  /* ── the shared file ───────────────────────────────────────────────────── */
+
+  /* todos, countdowns and the weather cache, to the shared file (and the copy in data.json) */
+  saveGlob() {
+    window.clearTimeout(this.globTimer);
+    this.globTimer = window.setTimeout(() => this.flushGlob(), 150);
+  }
+
+  flushGlob() {
+    window.clearTimeout(this.globTimer);
+    this.store.write({ v: 4, todos: this.glob.todos, countdowns: this.glob.countdowns, wx: this.glob.wx });
+    this.persist();
+  }
+
+  /* the settings, to the shared file. only called when you changed one, so a window you are not touching never overwrites yours */
+  shareSettings() {
+    if (this.settings.shareSettings === false) return;
+    this.store.write({ v: 4, settings: shareable(this.settings) });
+  }
+
+  /* another window (another vault) may have changed the file: pick up the todos, countdowns and settings */
+  syncShared() {
+    if (!this.store.ok || !this.store.changed()) return;
+    const d = this.store.read();
+    if (!d) return;
+    const ids = new Set();
+    if (Array.isArray(d.todos)) {
+      const t = cleanTodos(d.todos);
+      if (stable(t) !== stable(this.glob.todos)) { this.glob.todos = t; ids.add('todo'); }
+    }
+    if (typeof d.countdowns === 'string' && d.countdowns !== this.glob.countdowns) {
+      this.glob.countdowns = d.countdowns;
+      ids.add('countdown');
+    }
+    if (isPlain(d.wx) && (!this.glob.wx || (Number(d.wx.at) || 0) > (Number(this.glob.wx.at) || 0))) {
+      this.glob.wx = d.wx;
+      ids.add('weather');
+    }
+    if (this.settings.shareSettings !== false && isPlain(d.settings)) {
+      const incoming = shareable(d.settings);
+      if (stable(deepMerge(shareable(this.settings), incoming)) !== stable(shareable(this.settings))) {
+        const keep = {};
+        for (const k of LOCAL_ONLY) keep[k] = this.settings[k];
+        this.settings = sanitise(Object.assign(deepMerge(this.settings, incoming), keep));
+        uiCase.lower = this.settings.lowercaseUi;
+        this.rebuildAll();
+        return;
+      }
+    }
+    if (ids.size) this.refreshSoon(Array.from(ids), 50);
+  }
+
+  /* ── todos ─────────────────────────────────────────────────────────────── */
+
+  todoEdit(fn) {
+    this.syncShared();                      /* start from the newest list, in case another vault changed it */
+    fn(this.glob.todos);
+    this.glob.todos = cleanTodos(this.glob.todos);
+    this.saveGlob();
+    this.refreshSoon(['todo'], 0);
+  }
+
+  todoAdd(text) {
+    const t = String(text || '').trim();
+    if (!t) return null;
+    const item = { id: newId(), text: t, done: false, at: Date.now(), doneAt: 0 };
+    this.todoEdit((list) => { list.push(item); });
+    return item;
+  }
+
+  todoToggle(id) {
+    this.todoEdit((list) => {
+      const t = list.find((x) => x.id === id);
+      if (t) { t.done = !t.done; t.doneAt = t.done ? Date.now() : 0; }
+    });
+  }
+
+  todoRemove(id) {
+    this.todoEdit((list) => { const at = list.findIndex((x) => x.id === id); if (at >= 0) list.splice(at, 1); });
+  }
+
+  todoClearDone() {
+    this.todoEdit((list) => { for (let i = list.length - 1; i >= 0; i--) if (list[i].done) list.splice(i, 1); });
+  }
+
+  /* open ones first, in the order you added them, then the ticked ones */
+  todoSorted() {
+    const list = this.glob.todos.slice();
+    return list.filter((t) => !t.done).concat(list.filter((t) => t.done));
+  }
+
+  /* ── countdowns ────────────────────────────────────────────────────────── */
+
+  countdownList() {
+    const today = moment().startOf('day');
+    return parseCountdowns(this.glob.countdowns)
+      .map((c) => ({ label: c.label, when: c.when, days: c.when.diff(today, 'days') }))
+      .filter((c) => c.days >= 0)
+      .sort((a, b) => a.days - b.days);
+  }
+
+  countdownText(text) {
+    this.syncShared();
+    this.glob.countdowns = String(text);
+    this.saveGlob();
+    this.refreshSoon(['countdown'], 0);
+  }
+
+  /* ── weather ───────────────────────────────────────────────────────────── */
+
+  weatherUnit() {
+    const u = this.settings.weather.unit;
+    if (u === 'c' || u === 'f') return u;
+    const lang = (navigator.language || 'en-GB').toLowerCase();
+    return lang === 'en-us' || lang === 'en-lr' || lang === 'en-mm' ? 'f' : 'c';
+  }
+
+  weatherKey() { return (this.settings.weather.place || '~here').toLowerCase() + '|' + this.weatherUnit(); }
+
+  /* what we have, even if old. fetch() is the one that goes to the network */
+  weatherCached() {
+    const c = this.glob.wx;
+    return c && c.key === this.weatherKey() ? c : null;
+  }
+
+  weatherFresh() {
+    const c = this.weatherCached();
+    return Boolean(c && Date.now() - (Number(c.at) || 0) < 20 * 60000);
+  }
+
+  /* resolves to the weather, or null. asks at most once every two minutes after a failure. */
+  weatherFetch(force) {
+    if (this.wxBusy) return this.wxBusy;
+    if (!force && this.weatherFresh()) return Promise.resolve(this.weatherCached());
+    if (!force && this.wxFailAt && Date.now() - this.wxFailAt < 120000) return Promise.resolve(this.weatherCached());
+    this.wxBusy = this.weatherLoad().then((data) => {
+      this.wxFailAt = 0;
+      this.wxError = '';
+      this.glob.wx = data;
+      this.saveGlob();
+      return data;
+    }).catch((e) => {
+      this.wxFailAt = Date.now();
+      this.wxError = (e && e.message) || 'offline?';
+      return this.weatherCached();
+    }).then((data) => {
+      this.wxBusy = null;
+      this.refreshSoon(['weather'], 0);
+      return data;
+    });
+    return this.wxBusy;
+  }
+
+  async weatherLoad() {
+    const w = this.settings.weather;
+    const get = async (url) => {
+      const r = await requestUrl({ url, throw: false });
+      if (r.status !== 200) throw new Error('http ' + r.status);
+      return r.json;
+    };
+    let loc = null;
+    if (w.place) {
+      const g = await get('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=' + encodeURIComponent(w.place));
+      const hit = g && g.results && g.results[0];
+      if (!hit) throw new Error('no place called "' + w.place + '"');
+      loc = { name: hit.name, region: hit.admin1 || hit.country || '', lat: hit.latitude, lon: hit.longitude };
+    } else {
+      /* no place set: find roughly where this computer is from its internet address */
+      let ip = null;
+      try {
+        const a = await get('https://ipwho.is/');
+        if (a && a.success !== false && a.latitude != null) ip = { name: a.city, region: a.region || a.country, lat: a.latitude, lon: a.longitude };
+      } catch (e) { ip = null; }
+      if (!ip) {
+        const b = await get('https://ipapi.co/json/');
+        if (b && b.latitude != null) ip = { name: b.city, region: b.region || b.country_name, lat: b.latitude, lon: b.longitude };
+      }
+      if (!ip) throw new Error('could not work out where you are. set a place in settings.');
+      loc = ip;
+    }
+    const f = this.weatherUnit() === 'f';
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + loc.lat + '&longitude=' + loc.lon +
+      '&current=temperature_2m,apparent_temperature,relative_humidity_2m,is_day,weather_code,wind_speed_10m' +
+      '&hourly=temperature_2m,weather_code,precipitation_probability' +
+      '&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max' +
+      '&timezone=auto&forecast_days=2&temperature_unit=' + (f ? 'fahrenheit' : 'celsius') + '&wind_speed_unit=' + (f ? 'mph' : 'kmh');
+    const d = await get(url);
+    if (!d || !d.current) throw new Error('no forecast came back');
+    const hours = [];
+    const h = d.hourly || {};
+    (h.time || []).forEach((t, i) => hours.push({ t, temp: h.temperature_2m[i], code: h.weather_code[i], pop: (h.precipitation_probability || [])[i] }));
+    const dd = d.daily || {};
+    return {
+      key: this.weatherKey(),
+      at: Date.now(),
+      unit: f ? 'f' : 'c',
+      loc,
+      cur: {
+        temp: d.current.temperature_2m, feels: d.current.apparent_temperature, humidity: d.current.relative_humidity_2m,
+        code: d.current.weather_code, wind: d.current.wind_speed_10m, day: d.current.is_day === 1, time: d.current.time,
+      },
+      today: {
+        max: (dd.temperature_2m_max || [])[0], min: (dd.temperature_2m_min || [])[0],
+        sunrise: (dd.sunrise || [])[0], sunset: (dd.sunset || [])[0], pop: (dd.precipitation_probability_max || [])[0],
+      },
+      hours,
+    };
+  }
+
   /* ── refreshing ────────────────────────────────────────────────────────── */
 
   /* ids = list of section ids, or null for all of them */
@@ -1513,10 +1915,21 @@ class MishHome extends Plugin {
     this.saveTimer = window.setTimeout(() => this.saveAll(), 600);
   }
 
+  /* called by the settings tab: saves, and shares with the other vaults (after a pause, so a slider does not write on every tick) */
+  persistSettings() {
+    this.persist();
+    this.settingsDirty = true;
+    window.clearTimeout(this.settingsTimer);
+    this.settingsTimer = window.setTimeout(() => { this.settingsDirty = false; this.shareSettings(); }, 500);
+  }
+
   async saveAll() {
     await this.saveData({
       v: 4,
       settings: this.settings,
+      todos: this.glob.todos,
+      countdowns: this.glob.countdowns,
+      wx: this.glob.wx,
       focusLog: this.focusLog,
       opened: this.opened,
       activity: this.activity,
@@ -1602,80 +2015,116 @@ class HomeView extends ItemView {
   }
 
   /* ── fitting the page to the tab ───────────────────────────────────────────
-     the home page should never need scrolling. the card is laid out at the width it will end up
-     with, measured, and when it is too tall it is scaled down (and laid out wider by the same
-     factor, so it still fills the same width and needs fewer lines). if even the smallest allowed
-     scale is not enough, scrolling comes back, because unreachable content is worse. */
+     the page never scrolls. the grid under the prompt is exactly as big as the tab. whenever the tab
+     changes size, layoutDash() works out how many columns the room allows and how many rows, shows as many
+     cards as fit (first in the sections list = kept first), spreads them evenly over the rows, and puts
+     the terminal beside them, under them, or leaves it out. then each card hides whichever of its own
+     rows no longer fit. nothing is scaled, so text is always the size you chose. */
   scheduleFit() {
     if (this.fitRaf) return;
     this.fitRaf = requestAnimationFrame(() => {
       this.fitRaf = 0;
-      if (this.contentEl.isShown()) this.fit();
+      if (this.contentEl.isShown()) this.layoutDash();
     });
   }
 
-  fit() {
-    const scroll = this.scrollEl;
-    const card = this.cardEl;
-    if (!scroll || !card) return;
+  layoutDash() {
+    const dash = this.dashEl;
+    if (!dash || !dash.isConnected) return;
+    const W = dash.clientWidth;
+    const H = dash.clientHeight;
+    if (!(W > 60 && H > 60)) return;                   /* not laid out yet */
     const L = this.s.layout;
-    card.style.width = '';
-    card.style.margin = '';
-    card.style.transform = '';
-    card.style.transformOrigin = '';
-    scroll.classList.remove('is-overflow');
-    this.contentEl.classList.toggle('mh-fit', L.fit === 'shrink');
-    if (L.fit !== 'shrink') return;
+    const gap = L.gap;
+    const hero = this.refs.hero || null;
+    const term = this.refs.shell || null;
+    const cards = this.order.map((id) => this.refs[id]).filter((r) => r && r !== hero && r !== term);
 
-    const cs = (scroll.ownerDocument.defaultView || window).getComputedStyle(scroll);
-    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-    const availW = scroll.clientWidth - padX;
-    const availH = scroll.clientHeight - padY;
-    if (!(availW > 80 && availH > 80)) return;       /* not laid out yet */
+    /* the terminal: a tall pane on the right when there is room, a row at the bottom when the tab is tall, else left out */
+    let mode = 'off';
+    if (term) {
+      if (!hero && !cards.length) mode = 'bottom';                 /* the terminal on its own gets the whole tab */
+      else if (W >= 860 && H >= 340) mode = 'side';
+      else if (H >= 740 && W >= 340) mode = 'bottom';
+    }
+    const sideW = mode === 'side' ? Math.round(Math.min(L.sideWidth, Math.max(300, W * 0.34))) : 0;
+    const mainW = mode === 'side' ? W - sideW - gap : W;
+    const cols = Math.max(1, Math.min(L.columns, Math.floor((mainW + gap) / (MIN_CARD_W + gap))));
 
-    const baseW = Math.min(availW, L.width);
-    const floor = L.minScale / 100;
-    /* the card is laid out at baseW / k and then scaled by k, so it always ends up baseW wide.
-       a smaller k means a wider layout, which means fewer wrapped lines and maybe more columns,
-       so the visible height (layout height * k) only ever shrinks as k shrinks. bisect for the
-       largest k that fits. */
-    const visible = (k) => {
-      card.style.width = (baseW / k) + 'px';
-      return card.offsetHeight * k;
+    /* how many rows of cards fit under the first card (the clock) and above the bottom terminal */
+    const heroMin = hero ? (H < 470 ? 120 : 164) : 0;
+    const termMin = mode === 'bottom' ? 190 : 0;
+    const fixedRows = (hero ? 1 : 0) + (mode === 'bottom' ? 1 : 0);
+    /* without a clock card, at least one card is always shown, however small the tab */
+    const rowsFit = Math.max(hero || mode === 'bottom' ? 0 : 1, Math.floor((H - heroMin - termMin - gap * (fixedRows - 1)) / (MIN_CARD_H + gap)));
+    const show = cards.slice(0, rowsFit * cols);
+    const n = show.length;
+    const rows = n ? Math.ceil(n / cols) : 0;
+
+    /* spread n cards over the rows as evenly as possible: 7 cards in 3 columns is 3 + 2 + 2, not 3 + 3 + 1.
+       the grid has 12 columns, so a row of 1, 2, 3 or 4 cards divides it exactly. */
+    const span = new Map();
+    let at = 0;
+    for (let r = 0; r < rows; r++) {
+      const k = Math.floor(n / rows) + (r < n % rows ? 1 : 0);
+      for (let j = 0; j < k; j++) span.set(show[at++], 12 / k);
+    }
+
+    const tracks = [];
+    if (hero) tracks.push('minmax(0, 1.2fr)');
+    for (let r = 0; r < rows; r++) tracks.push('minmax(0, 1fr)');
+    if (mode === 'bottom') tracks.push('minmax(0, 1fr)');
+    if (!tracks.length) tracks.push('minmax(0, 1fr)');
+    dash.style.gridTemplateColumns = 'repeat(12, minmax(0, 1fr))' + (sideW ? ' ' + sideW + 'px' : '');
+    dash.style.gridTemplateRows = tracks.join(' ');
+
+    const place = (ref, visible, col, row) => {
+      ref.sec.classList.toggle('is-off', !visible);
+      ref.sec.style.gridColumn = col || '';
+      ref.sec.style.gridRow = row || '';
     };
-    /* "does it fit" is not smooth: widening the layout can flip it to a dock or add a column, which
-       drops the height in a step. so scan down in small steps, then refine inside the last step. */
-    const fits = (k) => visible(k) <= availH;
-    let k = 1;
-    if (!fits(1)) {
-      let found = null;
-      for (let kk = 0.98; kk >= floor - 1e-9; kk -= 0.02) {
-        if (fits(kk)) { found = kk; break; }
-      }
-      if (found === null) {
-        k = floor;
-      } else {
-        let lo = found;
-        let hi = Math.min(1, found + 0.02);
-        for (let i = 0; i < 5; i++) {
-          const mid = (lo + hi) / 2;
-          if (fits(mid)) lo = mid; else hi = mid;
-        }
-        k = lo;
+    for (const id of this.order) {
+      const ref = this.refs[id];
+      if (!ref) continue;
+      if (ref === hero) place(ref, true, '1 / 13', '1');
+      else if (ref === term) place(ref, mode !== 'off', mode === 'side' ? '13' : '1 / 13', mode === 'side' ? '1 / ' + (tracks.length + 1) : String(tracks.length));
+      else if (span.has(ref)) place(ref, true, 'span ' + span.get(ref), '');
+      else place(ref, false, '', '');
+    }
+    this.termMode = mode;
+    dash.dataset.cols = String(cols);
+
+    /* now every visible card makes its own content fit */
+    for (const id of this.order) {
+      const ref = this.refs[id];
+      if (ref && !ref.sec.classList.contains('is-off')) this.squeeze(ref);
+    }
+  }
+
+  /* hides the rows of a card, last first, until what is left fits. rows are marked data-drop="n": the
+     bigger the n, the sooner it goes. a list sits in its own data-fitbox so the box around it is measured. */
+  squeeze(ref) {
+    const body = ref.body;
+    const items = Array.from(body.querySelectorAll('[data-drop]'));
+    if (!items.length) return;
+    for (const it of items) it.hidden = false;
+    const groups = new Map();
+    for (const it of items) {
+      const box = it.closest('[data-fitbox]') || body;
+      if (!groups.has(box)) groups.set(box, []);
+      groups.get(box).push(it);
+    }
+    for (const [box, list] of groups) {
+      const over = () => box.scrollHeight > box.clientHeight + 1;
+      if (!over()) continue;
+      const order = list
+        .map((it, i) => ({ it, i, pri: Number(it.dataset.drop) || 1 }))
+        .sort((a, b) => (b.pri - a.pri) || (b.i - a.i));
+      for (const o of order) {
+        o.it.hidden = true;
+        if (!over()) break;
       }
     }
-    card.style.width = (baseW / k) + 'px';
-    const h = card.offsetHeight;
-
-    const c = this.s.card;
-    const offX = c.hAlign === 'left' ? 0 : Math.max(0, (availW - baseW) / 2);
-    const offY = c.vAlign === 'top' ? 0 : Math.max(0, (availH - h * k) / 2);
-    card.style.transformOrigin = '0 0';
-    card.style.transform = k < 1 ? 'scale(' + k + ')' : '';
-    /* the negative bottom margin cancels the room the unscaled box would take */
-    card.style.margin = offY + 'px 0 ' + (h * k - h) + 'px ' + offX + 'px';
-    if (h * k > availH + 1) scroll.classList.add('is-overflow');
   }
 
   focusShell() {
@@ -1697,38 +2146,27 @@ class HomeView extends ItemView {
     this.refs = {};
     this.clockEl = null;
     this.upEl = null;
+    this.termMode = 'off';
 
     const scroll = el('div', 'mh-scroll');
     const card = el('div', 'mh');
-    const left = el('div', 'mh-left');
     this.bar = el('div', 'mh-bar');
-    left.appendChild(this.bar);
+    card.appendChild(this.bar);
 
-    /* the terminal can live in a tall pane on the right (a dock) instead of in the flow */
-    const grid = el('div', 'mh-grid');
+    const dash = el('div', 'mh-dash');
     const active = s.sections.filter((it) => it.on);
-    let dock = null;
-    for (const it of active) {
-      const sec = this.makeSection(it);
-      if (it.id === 'shell' && s.terminal.position === 'right') dock = sec;
-      else grid.appendChild(sec);
-    }
-    if (!active.length) grid.appendChild(el('div', 'mh-hint is-wide', '# every section is switched off. open settings > mish.home.'));
-    left.appendChild(grid);
-    card.appendChild(left);
-    if (dock) {
-      const pane = el('div', 'mh-dock');
-      pane.appendChild(dock);
-      card.appendChild(pane);
-    }
-    card.classList.toggle('has-dock', Boolean(dock));
+    this.order = active.map((it) => it.id);
+    active.forEach((it, i) => dash.appendChild(this.makeSection(it, i)));
+    if (!active.length) dash.appendChild(el('div', 'mh-hint', '# every section is switched off. open settings > mish.home.'));
+    card.appendChild(dash);
     scroll.appendChild(card);
     host.appendChild(scroll);
     this.scrollEl = scroll;
     this.cardEl = card;
+    this.dashEl = dash;
     if (typeof ResizeObserver === 'function') {
       this.fitRO = new ResizeObserver(() => this.scheduleFit());
-      this.fitRO.observe(scroll);
+      this.fitRO.observe(dash);
     }
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.scheduleFit());
 
@@ -1744,33 +2182,34 @@ class HomeView extends ItemView {
     const font = fontStack(s);
     if (font) vars['--vf-mono'] = font;
     vars['--mh-termlines'] = String(s.terminal.height);
-    vars['--mh-dock'] = s.terminal.dockWidth + '%';
     applyVars(host, vars);
     setClassGroup(host, 'mh-shape-', s.pillShape);
     setClassGroup(host, 'mh-frame-', s.layout.frame);
-    setClassGroup(host, 'mh-cols-', String(s.layout.columns));
     host.classList.toggle('mh-lower', s.lowercaseText);
     host.classList.toggle('mh-nocmd', !s.showCommands);
     if (this.leaf && this.leaf.updateHeader) this.leaf.updateHeader();     /* picks up a new tab title */
     this.scheduleFit();
   }
 
-  makeSection(it) {
-    const sec = el('div', 'mh-sec mh-sec-' + it.id + (it.wide ? ' is-wide' : ''));
-    sec.dataset.id = it.id;
+  /* one card: a small coloured pill with the name of the command that "drew" it, then the content */
+  makeSection(it, index) {
+    const id = it.id;
+    const sec = el('div', 'mh-sec mh-sec-' + id);
+    sec.dataset.id = id;
     const refs = { sec };
-    const cmd = this.s.showCommands ? this.cmdFor(it.id) : null;
+    const cmd = this.s.showCommands && id !== 'hero' && id !== 'shell' ? this.cmdFor(id) : null;
     if (cmd) {
-      const line = el('div', 'mh-cmd');
-      line.appendChild(el('span', 'mh-chev', '❯'));
-      line.appendChild(el('span', 'mh-exe', cmd[0]));
+      const head = el('div', 'mh-head');
+      head.appendChild(el('span', 'mh-pill mh-pf' + (index % COLOURS), cmd[0]));
       refs.arg = el('span', 'mh-arg', cmd[1]);
-      line.appendChild(refs.arg);
-      sec.appendChild(line);
+      head.appendChild(refs.arg);
+      refs.meta = el('span', 'mh-meta');
+      head.appendChild(refs.meta);
+      sec.appendChild(head);
     }
     refs.body = el('div', 'mh-body');
     sec.appendChild(refs.body);
-    this.refs[it.id] = refs;
+    this.refs[id] = refs;
     return sec;
   }
 
@@ -1778,8 +2217,9 @@ class HomeView extends ItemView {
   cmdFor(id) {
     const s = this.s;
     switch (id) {
-      case 'greeting': return ['hello', ''];
-      case 'calendar': return ['cal', ''];
+      case 'todo': return ['todo', ''];
+      case 'weather': return ['weather', ''];
+      case 'countdown': return ['countdown', ''];
       case 'focus': return ['timer', '--pomodoro'];
       case 'system': return ['top', '-n1'];
       case 'links': return ['go', ''];
@@ -1801,14 +2241,21 @@ class HomeView extends ItemView {
     }
   }
 
+  /* rows from the notes-based sections: any of them can be hidden when the card is short of room */
+  markRows(body) {
+    for (const n of body.querySelectorAll('.mh-row, .mh-task, .mh-sc, .mh-brow, .mh-rline, .mh-gl')) {
+      if (!n.dataset.drop) n.dataset.drop = '1';
+    }
+  }
+
   fill(id) {
     const r = this.refs[id];
     const fn = this['fill_' + id];
     if (!r || !fn) return;
     try {
       const out = fn.call(this, r.body);
-      if (out && out.then) out.then(() => this.scheduleFit(), (e) => this.broke(id, e));
-      else this.scheduleFit();
+      if (out && out.then) out.then(() => { this.markRows(r.body); this.scheduleFit(); }, (e) => this.broke(id, e));
+      else { this.markRows(r.body); this.scheduleFit(); }
     } catch (e) {
       this.broke(id, e);
     }
@@ -1844,8 +2291,7 @@ class HomeView extends ItemView {
     const minute = Math.floor(now / 60000);
     if (minute !== this.minute) {
       this.minute = minute;
-      for (const id of ['greeting', 'calendar']) if (this.refs[id]) this.fill(id);
-      if (this.refs.banner && (this.s.banner.source === 'time' || this.s.banner.side === 'clock')) this.fill('banner');
+      for (const id of ['hero', 'countdown', 'weather']) if (this.refs[id]) this.fill(id);
       this.updatePrompt();
     }
   }
@@ -1886,45 +2332,39 @@ class HomeView extends ItemView {
     bar.classList.toggle('is-empty', !bar.childNodes.length);
   }
 
-  /* ── banner ────────────────────────────────────────────────────────────── */
+  /* ── hero: the big clock and the greeting, side by side (stacked in a narrow card) ── */
 
-  /* the small block letters on the right of the banner */
-  bannerSideText() {
-    const side = this.s.banner.side;
-    if (side === 'clock') {
-      const d = new Date();
-      const h = this.s.clock.hour12 ? d.getHours() % 12 || 12 : d.getHours();
-      return pad(h) + ':' + pad(d.getMinutes());
-    }
-    if (side === 'date') return moment().format('ddd D MMM').toLowerCase();
-    return '';
+  fill_hero(body) {
+    body.replaceChildren();
+    const clock = el('div', 'mh-hclock');
+    const info = el('div', 'mh-hinfo');
+    body.appendChild(clock);
+    body.appendChild(info);
+    info.dataset.fitbox = '1';            /* the greeting's rows are measured against this box */
+    this.fill_banner(clock);
+    this.fill_greeting(info);
   }
+
+  /* ── banner ────────────────────────────────────────────────────────────── */
 
   fill_banner(body) {
     const b = this.s.banner;
     body.replaceChildren();
+    body.classList.toggle('is-centre', b.align === 'centre');
     let text = this.app.vault.getName();
     if (b.source === 'name') text = this.userName();
     else if (b.source === 'time') {
       const d = new Date();
       const h = this.s.clock.hour12 ? d.getHours() % 12 || 12 : d.getHours();
       text = pad(h) + ':' + pad(d.getMinutes());
-    } else if (b.source === 'custom' && b.custom.trim()) text = b.custom.trim();
+    }
+    else if (b.source === 'custom' && b.custom.trim()) text = b.custom.trim();
     if (b.style === 'text') {
-      body.classList.remove('has-side');
-      body.classList.toggle('is-centre', b.align === 'centre');
       body.appendChild(el('div', 'mh-btext mh-grad-' + b.gradient, text));
       return;
     }
-    const sideText = b.side !== 'none' ? this.bannerSideText() : '';
-    body.classList.toggle('has-side', Boolean(sideText));
-    body.classList.toggle('is-centre', b.align === 'centre' && !sideText);
     const svg = bannerSvg(text, this.uid, b.gradient, b.letters);
     if (svg) body.appendChild(svg);
-    if (sideText) {
-      const side = bannerSvg(sideText, this.uid + 's', b.gradient, b.letters);
-      if (side) { side.classList.add('mh-bside'); body.appendChild(side); }
-    }
   }
 
   /* ── greeting ──────────────────────────────────────────────────────────── */
@@ -1989,6 +2429,7 @@ class HomeView extends ItemView {
     for (const key of ['day', 'week', 'month', 'year']) {
       if (!g.progress[key]) continue;
       const row = el('div', 'mh-prog');
+      row.dataset.drop = { day: '1', week: '3', month: '4', year: '2' }[key];     /* the month goes first when room is short */
       row.appendChild(el('span', 'mh-pk', key));
       const bar = el('span', 'mh-pbar');
       const on = Math.round(fracs[key] * N);
@@ -2168,8 +2609,14 @@ class HomeView extends ItemView {
 
     const labelW = st.dayLabels ? 30 : 0;
     const avail = body.clientWidth;
+    /* the card has a fixed height now, so the squares shrink (down to 5 px) until seven rows of them fit */
+    const availH = body.clientHeight;
+    let cellPx = st.cell;
+    if (availH > 60) cellPx = Math.max(5, Math.min(st.cell, Math.floor((availH - 62) / 7 - st.gap)));
+    body.style.setProperty('--mh-cell', cellPx + 'px');
+    this.streakH = availH;
     let W = st.weeks;
-    if (!W) W = avail > 40 ? Math.floor((avail - labelW + st.gap) / (st.cell + st.gap)) : 26;
+    if (!W) W = avail > 40 ? Math.floor((avail - labelW + st.gap) / (cellPx + st.gap)) : 26;
     W = Math.max(4, Math.min(53, W));
     if (this.refs.streak && this.refs.streak.arg) setText(this.refs.streak.arg, '--weeks=' + W);
 
@@ -2178,8 +2625,12 @@ class HomeView extends ItemView {
       this.streakW = avail;
       this.streakRO = new ResizeObserver(() => {
         const w = body.clientWidth;
-        if (this.s.streak.weeks === 0 && Math.abs(w - (this.streakW || 0)) > 2) {
+        const h = body.clientHeight;
+        const wChanged = this.s.streak.weeks === 0 && Math.abs(w - (this.streakW || 0)) > 2;
+        const hChanged = Math.abs(h - (this.streakH || 0)) > 2;
+        if (wChanged || hChanged) {
           this.streakW = w;
+          this.streakH = h;
           requestAnimationFrame(() => this.fill('streak'));
         }
       });
@@ -2315,56 +2766,233 @@ class HomeView extends ItemView {
     else this.plugin.runCommand('global-search:open');
   }
 
-  /* ── calendar ──────────────────────────────────────────────────────────── */
+  /* ── todo: your own list, the same in every vault ──────────────────────── */
 
-  fill_calendar(body) {
-    const c = this.s.calendar;
+  focusTodo() {
+    const i = this.todoInput;
+    if (!i || !i.isConnected) return false;
+    i.focus();
+    return true;
+  }
+
+  fill_todo(body) {
+    const p = this.plugin;
+    /* a redraw (another vault changed the list) must not eat what you are typing */
+    const prev = this.todoInput && this.todoInput.isConnected ? this.todoInput : null;
+    const keep = prev ? { v: prev.value, focus: document.activeElement === prev } : null;
     body.replaceChildren();
-    if (!this.calMonth) this.calMonth = moment().startOf('month');
-    const month = this.calMonth.clone();
-    const today = moment().format('YYYY-MM-DD');
-    const marks = c.mark === 'none' ? null : this.plugin.dayCounts(c.mark === 'daily' ? 'daily' : 'edits');
+    const list = p.todoSorted();
+    const open = list.filter((t) => !t.done).length;
+    const ref = this.refs.todo;
+    if (ref && ref.meta) setText(ref.meta, list.length ? open + ' open' : '');
 
-    const head = el('div', 'mh-calhead');
-    const step = (n) => { this.calMonth = this.calMonth.clone().add(n, 'months'); this.fill('calendar'); };
-    if (c.arrows) {
-      const prev = el('span', 'mh-calbtn', '←');
-      prev.title = 'previous month';
-      prev.addEventListener('click', () => step(-1));
-      head.appendChild(prev);
+    const box = el('div', 'mh-tlist');
+    box.dataset.fitbox = '1';
+    if (!list.length) box.appendChild(this.hint('nothing to do. suspicious.'));
+    for (const t of list) {
+      const row = el('div', 'mh-todo' + (t.done ? ' is-done' : ''));
+      row.dataset.drop = t.done ? '9' : '1';          /* ticked ones make room first */
+      row.appendChild(el('span', 'mh-box', t.done ? '[x]' : '[ ]'));
+      row.appendChild(el('span', 'mh-ttext', t.text));
+      const del = el('span', 'mh-tdel', '×');
+      del.title = ui('remove');
+      row.appendChild(del);
+      row.addEventListener('click', () => p.todoToggle(t.id));
+      del.addEventListener('click', (ev) => { ev.stopPropagation(); p.todoRemove(t.id); });
+      box.appendChild(row);
     }
-    const title = el('span', 'mh-caltitle', month.format('MMMM YYYY'));
-    title.title = 'back to this month';
-    title.addEventListener('click', () => { this.calMonth = moment().startOf('month'); this.fill('calendar'); });
-    head.appendChild(title);
-    if (c.arrows) {
-      const next = el('span', 'mh-calbtn', '→');
-      next.title = 'next month';
-      next.addEventListener('click', () => step(1));
-      head.appendChild(next);
-    }
-    body.appendChild(head);
+    body.appendChild(box);
 
-    const startDow = this.s.weekStart === 'sun' ? 0 : 1;
-    const grid = el('div', 'mh-cal' + (c.weekNumbers ? ' has-wk' : ''));
-    if (c.weekNumbers) grid.appendChild(el('span', 'mh-calwd', 'wk'));
-    for (let i = 0; i < 7; i++) grid.appendChild(el('span', 'mh-calwd', DAYS[(startDow + i) % 7].slice(0, 2)));
-    const offset = (month.day() - startDow + 7) % 7;
-    const start = month.clone().subtract(offset, 'days');
-    const weeks = Math.ceil((offset + month.daysInMonth()) / 7);
-    for (let w = 0; w < weeks; w++) {
-      if (c.weekNumbers) grid.appendChild(el('span', 'mh-calwk', String(start.clone().add(w * 7 + 3, 'days').isoWeek())));
-      for (let d = 0; d < 7; d++) {
-        const day = start.clone().add(w * 7 + d, 'days');
-        const key = day.format('YYYY-MM-DD');
-        const n = marks ? marks.get(key) || 0 : 0;
-        const cell = el('span', 'mh-day' + (day.month() !== month.month() ? ' is-out' : '') + (key === today ? ' is-today' : '') + (n > 0 ? ' has-note' : ''), String(day.date()));
-        cell.title = key + (n ? ' · ' + n : '') + ' · click to open the daily note';
-        cell.addEventListener('click', () => this.plugin.openDaily(day.clone()));
-        grid.appendChild(cell);
+    const add = el('div', 'mh-tadd');
+    add.appendChild(el('span', 'mh-chev', '❯'));
+    const input = el('input', 'mh-tin');
+    input.type = 'text';
+    input.placeholder = 'add a task, press enter';
+    input.spellcheck = false;
+    input.autocomplete = 'off';
+    if (keep) input.value = keep.v;
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        const v = input.value.trim();
+        if (v) { input.value = ''; p.todoAdd(v); }
+      } else if (ev.key === 'Escape') {
+        input.blur();
+      }
+    });
+    add.appendChild(input);
+    if (list.some((t) => t.done)) {
+      const clear = el('span', 'mh-tclear', 'clear done');
+      clear.addEventListener('click', () => p.todoClearDone());
+      add.appendChild(clear);
+    }
+    body.appendChild(add);
+    this.todoInput = input;
+    if (keep && keep.focus) input.focus();
+  }
+
+  /* ── countdown ─────────────────────────────────────────────────────────── */
+
+  cdTone(days) { return days <= 3 ? 'mh-t0' : days <= 14 ? 'mh-t1' : days <= 45 ? 'mh-t2' : 'mh-t3'; }
+
+  fill_countdown(body) {
+    body.replaceChildren();
+    const list = this.plugin.countdownList();
+    if (!list.length) {
+      body.appendChild(this.hint('nothing to count down to.'));
+      body.appendChild(this.hint('countdown add exam 2026-12-01', 'is-code'));
+      return;
+    }
+    const first = list[0];
+    const top = el('div', 'mh-cdtop');
+    top.appendChild(el('span', 'mh-cdnum ' + this.cdTone(first.days), first.days === 0 ? 'today' : String(first.days)));
+    const side = el('div', 'mh-cdside');
+    if (first.days !== 0) side.appendChild(el('div', 'mh-cdunit', first.days === 1 ? 'day until' : 'days until'));
+    side.appendChild(el('div', 'mh-cdlabel', first.label));
+    top.appendChild(side);
+    body.appendChild(top);
+
+    const box = el('div', 'mh-cdlist');
+    box.dataset.fitbox = '1';
+    list.slice(1).forEach((c, i) => {
+      const row = el('div', 'mh-cdrow');
+      row.dataset.drop = String(i + 1);
+      row.appendChild(el('span', 'mh-cdd ' + this.cdTone(c.days), c.days === 0 ? 'today' : c.days + 'd'));
+      row.appendChild(el('span', 'mh-cdl', c.label));
+      row.appendChild(el('span', 'mh-cdw', c.when.format('D MMM')));
+      box.appendChild(row);
+    });
+    body.appendChild(box);
+  }
+
+  /* ── weather ───────────────────────────────────────────────────────────── */
+
+  /* the next twelve hours as a thin rainbow line */
+  sparkSvg(values) {
+    const W = 120;
+    const H = 30;
+    const pad = 3;
+    const lo = Math.min(...values);
+    const hi = Math.max(...values);
+    const span = Math.max(1, hi - lo);
+    const pts = values.map((v, i) => [(i / (values.length - 1)) * W, pad + (1 - (v - lo) / span) * (H - pad * 2)]);
+    const line = 'M' + pts.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L');
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('class', 'mh-spark');
+    svg.setAttribute('aria-hidden', 'true');
+    const id = 'mh-sp-' + this.uid;
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    const grad = document.createElementNS(SVG_NS, 'linearGradient');
+    grad.setAttribute('id', id);
+    grad.setAttribute('x1', '0'); grad.setAttribute('x2', '1'); grad.setAttribute('y1', '0'); grad.setAttribute('y2', '0');
+    for (let i = 0; i < COLOURS; i++) {
+      const stop = document.createElementNS(SVG_NS, 'stop');
+      stop.setAttribute('offset', String(i / (COLOURS - 1)));
+      stop.style.stopColor = 'var(--mh-f' + i + ')';
+      grad.appendChild(stop);
+    }
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+    const area = document.createElementNS(SVG_NS, 'path');
+    area.setAttribute('d', line + 'L' + W + ' ' + H + 'L0 ' + H + 'Z');
+    area.setAttribute('fill', 'url(#' + id + ')');
+    area.setAttribute('opacity', '0.14');
+    svg.appendChild(area);
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', line);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'url(#' + id + ')');
+    path.setAttribute('stroke-width', '1.8');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  fill_weather(body) {
+    const p = this.plugin;
+    const w = this.s.weather;
+    if (!p.weatherFresh()) p.weatherFetch(false);       /* redraws this card when it lands */
+    const data = p.weatherCached();
+    body.replaceChildren();
+    if (!data) {
+      const msg = this.hint(p.wxError ? 'no weather: ' + p.wxError + ' · click to retry' : 'finding the weather…', p.wxError ? 'is-bad' : '');
+      if (p.wxError) {
+        msg.classList.add('is-link');
+        msg.addEventListener('click', () => { p.wxError = ''; p.weatherFetch(true); this.fill('weather'); });
+      }
+      body.appendChild(msg);
+      return;
+    }
+    const c = data.cur;
+    const meta = wmo(c.code);
+    let icon = meta[1];
+    if (!c.day && icon === 'sun') icon = 'moon';
+    if (!c.day && icon === 'partly') icon = 'cloud';
+    const tone = { sun: 't1', moon: 't5', partly: 't2', cloud: 'dim', rain: 't4', snow: 't4', storm: 't5', fog: 'dim' }[icon] || 'dim';
+    const deg = (v) => (v == null ? '–' : Math.round(v) + '°');
+    const f = data.unit === 'f';
+
+    const top = el('div', 'mh-wtop');
+    const ic = el('span', 'mh-wico mh-' + tone);
+    ic.appendChild(iconEl(icon));
+    top.appendChild(ic);
+    const temp = el('span', 'mh-wtemp', deg(c.temp));
+    temp.appendChild(el('small', '', f ? 'f' : 'c'));
+    top.appendChild(temp);
+    const side = el('div', 'mh-wside');
+    side.appendChild(el('div', 'mh-wdesc', meta[0]));
+    side.appendChild(el('div', 'mh-wplace', (data.loc.name || 'here') + (data.loc.region ? ', ' + data.loc.region : '')));
+    top.appendChild(side);
+    body.appendChild(top);
+
+    const box = el('div', 'mh-wrest');
+    box.dataset.fitbox = '1';
+    body.appendChild(box);
+
+    const t = data.today || {};
+    if (w.details) {
+      const row = el('div', 'mh-wrow');
+      row.dataset.drop = '2';
+      const bit = (k, v) => {
+        const b = el('span', 'mh-wbit');
+        b.appendChild(el('span', 'mh-dim', k + ' '));
+        b.appendChild(document.createTextNode(v));
+        row.appendChild(b);
+      };
+      bit('feels', deg(c.feels));
+      bit('hi', deg(t.max));
+      bit('lo', deg(t.min));
+      bit('wind', Math.round(c.wind) + (f ? ' mph' : ' km/h'));
+      if (c.humidity != null) bit('humid', Math.round(c.humidity) + '%');
+      if (t.pop != null) bit('rain', t.pop + '%');
+      box.appendChild(row);
+
+      if (t.sunrise && t.sunset) {
+        const sun = el('div', 'mh-wrow mh-dim');
+        sun.dataset.drop = '5';             /* sunrise goes before the hourly line does */
+        sun.textContent = 'sunrise ' + String(t.sunrise).slice(11, 16) + ' · sunset ' + String(t.sunset).slice(11, 16);
+        box.appendChild(sun);
       }
     }
-    body.appendChild(grid);
+    if (w.hourly && data.hours && data.hours.length) {
+      const stamp = String(c.time).slice(0, 13);
+      let i0 = data.hours.findIndex((h) => String(h.t).slice(0, 13) >= stamp);
+      if (i0 < 0) i0 = 0;
+      const pts = data.hours.slice(i0, i0 + 13);
+      if (pts.length >= 6) {
+        const wrap = el('div', 'mh-wspark');
+        wrap.dataset.drop = '3';
+        wrap.appendChild(this.sparkSvg(pts.map((h) => h.temp)));
+        const lab = el('div', 'mh-wlab');
+        pts.forEach((h, k) => { if (k % 3 === 0) lab.appendChild(el('span', '', k === 0 ? 'now' : String(h.t).slice(11, 13) + 'h')); });
+        wrap.appendChild(lab);
+        box.appendChild(wrap);
+      }
+    }
   }
 
   /* ── focus timer ───────────────────────────────────────────────────────── */
@@ -2401,6 +3029,7 @@ class HomeView extends ItemView {
     mk('skip', () => this.plugin.focusSkip());
     body.appendChild(btns);
     f.sum = el('div', 'mh-fosum');
+    f.sum.dataset.drop = '1';
     body.appendChild(f.sum);
     this.focusRefs = f;
     this.updateFocus();
@@ -2521,11 +3150,14 @@ class HomeView extends ItemView {
     let rows = 0;
     const row = (key, frac, text, mode) => {
       rows++;
-      kv.appendChild(el('span', 'mh-k', key));
+      const r = el('div', 'mh-srow');
+      r.dataset.drop = String(rows);               /* the last rows go first when the card is short */
+      r.appendChild(el('span', 'mh-k', key));
       const v = el('span', 'mh-sv');
       if (frac != null) v.appendChild(this.barEl(frac, s.barWidth, mode));
       v.appendChild(el('span', 'mh-sval', text));
-      kv.appendChild(v);
+      r.appendChild(v);
+      kv.appendChild(r);
     };
     if (s.cpu) {
       const c = p.cpuNow();
@@ -2837,6 +3469,26 @@ class HomeView extends ItemView {
 
     this.renderScrollback();
     this.updatePrompt();
+    this.runStartup();
+  }
+
+  /* the tall pane would be a black box with one line in it, so the first time it opens in a session it
+     runs a few commands, like a login message. they are not added to your history, and clear empties them. */
+  runStartup() {
+    const p = this.plugin;
+    if (!this.refs.shell || p.startupDone || p.scrollback.length) return;
+    const list = String(this.s.terminal.startup || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 6);
+    if (!list.length) return;
+    /* wait for the page to be laid out: in a narrow tab the terminal is a short window under the sections, and a
+       login message would just scroll past in it */
+    window.setTimeout(async () => {
+      const sh = this.refs.shell;
+      if (p.startupDone || p.scrollback.length || !sh || !sh.out || sh.out.clientHeight < 140) return;
+      p.startupDone = true;
+      for (const c of list) {
+        try { await this.exec(c, true); } catch (e) { console.error('mish.home: startup command failed', e); }
+      }
+    }, 250);
   }
 
   /* ── completion ────────────────────────────────────────────────────────── */
@@ -2951,12 +3603,14 @@ class HomeView extends ItemView {
 
   /* ── running things ────────────────────────────────────────────────────── */
 
-  async exec(line) {
+  async exec(line, quiet) {
     const raw = line.trim();
     if (!raw) return;
     const p = this.plugin;
-    if (p.history[p.history.length - 1] !== raw) p.history.push(raw);
-    p.persist();
+    if (!quiet) {
+      if (p.history[p.history.length - 1] !== raw) p.history.push(raw);
+      p.persist();
+    }
 
     const tokens = tokenise(raw);
     const name = tokens[0].toLowerCase();
@@ -3221,10 +3875,10 @@ class HomeView extends ItemView {
       this.openSearch(args.join(' '));
       return [[T('searching for ' + args.join(' '), 'dim')]];
     });
-    def('todo', 'todo [add <text>]', 'list open tasks, or add one', 'read', async (args, rest) => {
+    def('tasks', 'tasks [add <text>]', 'open checkboxes in this vault, or add one to your daily note', 'read', async (args, rest) => {
       if (args[0] && args[0].toLowerCase() === 'add') {
         const text = rest.replace(/^add\s*/i, '').trim();
-        if (!text) throw new CmdError('todo add: what needs doing?');
+        if (!text) throw new CmdError('tasks add: what needs doing?');
         const f = await plugin.capture(text, 'task');
         plugin.refreshSoon(['tasks'], 800);
         return [[T('[ ] ', 't3'), text, T('  → ', 'dim'), LINK(f.path, f, 't3')]];
@@ -3234,6 +3888,29 @@ class HomeView extends ItemView {
       return [[T(String(d.total), 't3'), T(' open in ' + d.noteCount + ' notes', 'dim')]].concat(
         d.items.map((t) => [T('[ ] ', 't3'), LINK(t.text, t.file, 'fg', t.line), T('  ' + t.file.basename, 'dim')])
       );
+    });
+
+    def('todo', 'todo [add <text> | done <n> | rm <n> | clear]', 'your todo list, the same in every vault', 'read', (args, rest) => {
+      const sub = (args[0] || '').toLowerCase();
+      const list = plugin.todoSorted();
+      if (sub === 'add') {
+        const text = rest.replace(/^add\s*/i, '').trim();
+        if (!text) throw new CmdError('todo add: what needs doing?');
+        plugin.todoAdd(text);
+        return [[T('+ ', 't3'), text]];
+      }
+      if (sub === 'done' || sub === 'rm' || sub === 'del') {
+        const n = Number(args[1]);
+        const t = list[n - 1];
+        if (!Number.isInteger(n) || !t) throw new CmdError('todo ' + sub + ': there is no item ' + (args[1] || 'with that number') + '. run todo to see the numbers.');
+        if (sub === 'done') { plugin.todoToggle(t.id); return [[T(t.done ? '[ ] ' : '[x] ', 't3'), t.text]]; }
+        plugin.todoRemove(t.id);
+        return [[T('removed ', 'dim'), t.text]];
+      }
+      if (sub === 'clear') { plugin.todoClearDone(); return [[T('cleared the ticked ones', 'dim')]]; }
+      if (sub) throw new CmdError('todo: try todo add <text>, todo done <n>, todo rm <n> or todo clear');
+      if (!list.length) return [[T('nothing to do. suspicious.', 'dim')]];
+      return list.map((t, i) => [T(String(i + 1).padStart(2) + ' ', 'dim'), T(t.done ? '[x] ' : '[ ] ', t.done ? 'dim' : 't3'), t.done ? T(t.text, 'dim') : t.text]);
     });
 
     /* ── write ── */
@@ -3281,6 +3958,44 @@ class HomeView extends ItemView {
       }
       return out;
     });
+    def(['countdown', 'days'], 'countdown [add <name> <date> | rm <n>]', 'days left until the things you are waiting for', 'time', (args, rest) => {
+      const sub = (args[0] || '').toLowerCase();
+      const lines = String(plugin.glob.countdowns || '').split('\n');
+      if (sub === 'add') {
+        const words = rest.replace(/^add\s*/i, '').trim().split(/\s+/).filter(Boolean);
+        let when = null;
+        let cut = 0;
+        for (const k of [3, 1]) {
+          if (words.length > k) {
+            const d = parseDate(words.slice(-k).join(' '));
+            if (d) { when = d; cut = k; break; }
+          }
+        }
+        if (!when) throw new CmdError('countdown add: end with a date, like 2026-12-01 or 1 dec 2026');
+        const label = words.slice(0, words.length - cut).join(' ').replace(/^["']|["']$/g, '');
+        plugin.countdownText(lines.filter((l) => l.trim()).concat(label + ' | ' + when.format('YYYY-MM-DD')).join('\n'));
+        return [[T('+ ', 't3'), label, T('  ' + when.format('D MMM YYYY'), 'dim')]];
+      }
+      if (sub === 'rm' || sub === 'del') {
+        const item = plugin.countdownList()[Number(args[1]) - 1];
+        if (!item) throw new CmdError('countdown rm: there is no item ' + (args[1] || 'with that number') + '. run countdown to see the numbers.');
+        const at = lines.findIndex((l) => {
+          const c = parseCountdowns(l)[0];
+          return c && c.label === item.label && c.when.isSame(item.when, 'day');
+        });
+        if (at >= 0) lines.splice(at, 1);
+        plugin.countdownText(lines.join('\n'));
+        return [[T('removed ', 'dim'), item.label]];
+      }
+      if (sub) throw new CmdError('countdown: try countdown add <name> <date> or countdown rm <n>');
+      const list = plugin.countdownList();
+      if (!list.length) return [[T('nothing to count down to. try: countdown add exam 2026-12-01', 'dim')]];
+      return list.map((c, i) => [
+        T(String(i + 1).padStart(2) + ' ', 'dim'),
+        T((c.days === 0 ? 'today' : c.days + 'd').padEnd(6), c.days <= 3 ? 't0' : c.days <= 14 ? 't1' : c.days <= 45 ? 't2' : 't3'),
+        c.label, T('  ' + c.when.format('D MMM'), 'dim'),
+      ]);
+    });
     def(['focus', 'timer', 'pomodoro'], 'focus [start|pause|reset|skip|<minutes>]', 'the pomodoro timer', 'time', (args) => {
       const sub = (args[0] || 'status').toLowerCase();
       if (/^\d+$/.test(sub)) {
@@ -3303,6 +4018,19 @@ class HomeView extends ItemView {
     });
 
     /* ── info ── */
+    def('weather', 'weather [refresh]', 'the weather where you are', 'info', async (args) => {
+      const data = await plugin.weatherFetch(Boolean(args[0]));
+      if (!data) throw new CmdError('weather: ' + (plugin.wxError || 'no forecast yet'));
+      const f = data.unit === 'f';
+      const deg = (v) => (v == null ? '–' : Math.round(v) + '°');
+      const c = data.cur;
+      const t = data.today || {};
+      return [
+        [T(deg(c.temp) + (f ? 'f' : 'c'), 't1'), '  ' + wmo(c.code)[0], T('  ' + (data.loc.name || '') + (data.loc.region ? ', ' + data.loc.region : ''), 'dim')],
+        [T('feels ', 'dim'), deg(c.feels), T('  hi ', 'dim'), deg(t.max), T('  lo ', 'dim'), deg(t.min),
+          T('  wind ', 'dim'), Math.round(c.wind) + (f ? ' mph' : ' km/h'), T('  humid ', 'dim'), Math.round(c.humidity) + '%'],
+      ];
+    });
     def(['stats', 'fastfetch', 'neofetch'], 'stats', 'a summary of the vault', 'info', () => {
       const st = plugin.vaultStats();
       let path = this.app.vault.getName();
@@ -3372,8 +4100,8 @@ class HomeView extends ItemView {
       b.source = 'custom';
       b.custom = rest;
       plugin.persist();
-      for (const v of plugin.views) v.fill('banner');
-      return this.refs.banner ? [[T('banner: ' + rest, 'dim')]] : [[T('the banner section is switched off (settings > sections)', 'dim')]];
+      for (const v of plugin.views) v.fill('hero');
+      return this.refs.hero ? [[T('banner: ' + rest, 'dim')]] : [[T('the clock and greeting card is switched off (settings > sections)', 'dim')]];
     });
     def('clear', 'clear', 'clear the terminal', 'look', () => CLEAR);
     def('reload', 'reload', 'redraw the whole page', 'look', () => {
@@ -3464,7 +4192,7 @@ class HomeSettingTab extends PluginSettingTab {
       else if (kind === 'bar') { plugin.probe(); }
       else if (kind === 'data') { plugin.restyleAll(); for (const v of plugin.views) v.refresh(null); }
       else plugin.restyleAll();
-      plugin.persist();
+      plugin.persistSettings();
     };
 
     const get = (path) => { const [o, k] = at(path); return o[k]; };
@@ -3586,6 +4314,7 @@ class HomeSettingTab extends PluginSettingTab {
 
     /* ── sections ── */
     head('sections');
+    new UiSetting(containerEl).setDesc(ui('the order here is the order of priority: when the tab is small, the cards at the top stay and the ones at the bottom are left out. the page never scrolls. the terminal is not a card: it sits in a tall pane on the right when there is room.'));
     const move = (i, d) => {
       const j = i + d;
       if (j < 0 || j >= s.sections.length) return;
@@ -3599,19 +4328,50 @@ class HomeSettingTab extends PluginSettingTab {
         .setName(meta.label)
         .setDesc(meta.desc)
         .addToggle((t) => t.setValue(it.on).onChange((v) => { it.on = v; apply('build'); this.redraw(); }))
-        .addExtraButton((b) => b
-          .setIcon(it.wide ? 'rectangle-horizontal' : 'square')
-          .setTooltip(ui(it.wide ? 'full width in the two-column layout' : 'half width in the two-column layout'))
-          .onClick(() => {
-            it.wide = !it.wide;
-            b.setIcon(it.wide ? 'rectangle-horizontal' : 'square');
-            b.setTooltip(ui(it.wide ? 'full width in the two-column layout' : 'half width in the two-column layout'));
-            apply('build');
-          }))
-        .addExtraButton((b) => b.setIcon('arrow-up').setTooltip(ui('move up')).onClick(() => move(i, -1)))
+                .addExtraButton((b) => b.setIcon('arrow-up').setTooltip(ui('move up')).onClick(() => move(i, -1)))
         .addExtraButton((b) => b.setIcon('arrow-down').setTooltip(ui('move down')).onClick(() => move(i, 1)));
     });
     tog('showCommands', 'command lines', 'the ❯ line above each section, like the command that drew it.', 'build');
+
+    /* ── weather, todo, countdown ── */
+    if (on('weather')) {
+    head('weather');
+    text('weather.place', 'place', 'a city, like coimbatore or london. leave it empty to use roughly where this computer is, found from its internet address.', 'where i am', 'data');
+    drop('weather.unit', 'temperature', 'auto uses fahrenheit for en-us and celsius everywhere else.', { auto: 'auto', c: 'celsius', f: 'fahrenheit' }, 'data');
+    tog('weather.details', 'details', 'feels like, high, low, wind, humidity, sunrise and sunset. they are the first to go when the card is short.', 'data');
+    tog('weather.hourly', 'next hours', 'a thin line of the temperature for the next twelve hours.', 'data');
+    new UiSetting(containerEl)
+      .setName('look again')
+      .setDesc('weather is asked for at most every twenty minutes. this asks right now.')
+      .addButton((b) => b.setButtonText(ui('refresh')).onClick(async () => {
+        plugin.wxError = '';
+        const got = await plugin.weatherFetch(true);
+        new Notice(ui(got ? 'weather updated.' : 'no weather: ' + (plugin.wxError || 'offline?')));
+      }));
+    }
+
+    if (on('countdown')) {
+    head('countdown');
+    let cdBox = null;
+    const cdSetting = new UiSetting(containerEl)
+      .setName('dates')
+      .setDesc(ui('one per line, as  label | date  (2026-12-01, or 1 dec 2026). days that have passed are hidden. the terminal can do this too: countdown add exam 2026-12-01. kept in your home folder, so every vault has the same list.'))
+      .addTextArea((t) => {
+        cdBox = t;
+        t.setValue(plugin.glob.countdowns).onChange((value) => plugin.countdownText(value));
+        t.inputEl.rows = 5;
+        t.inputEl.style.width = '100%';
+      });
+    cdSetting.settingEl.classList.add('mh-setting-area');
+    }
+
+    if (on('todo')) {
+    head('todo');
+    new UiSetting(containerEl)
+      .setName('clear ticked todos')
+      .setDesc(ui('ticked todos leave on their own a day after you tick them. this removes them now.'))
+      .addButton((b) => b.setButtonText(ui('clear')).onClick(() => plugin.todoClearDone()));
+    }
 
     /* ── prompt ── */
     head('prompt');
@@ -3625,26 +4385,24 @@ class HomeSettingTab extends PluginSettingTab {
     tog('clock.seconds', 'show seconds', 'the clock pill already ticks every second.', 'build');
 
     /* ── banner ── */
-    if (on('banner')) {
-    head('banner');
+    if (on('hero')) {
+    head('clock');
     drop('banner.source', 'text', 'what the big letters say.', { vault: 'the vault name', name: 'your name', time: 'the time (updates every minute)', custom: 'custom text' }, 'data');
     text('banner.custom', 'custom text', 'used when text is set to custom. letters, numbers, spaces and . - _ / are drawn; anything else is skipped.', 'welcome home', 'data');
     drop('banner.letters', 'letters', 'lowercase is a full lowercase block face with ascenders and descenders (mish.shell). capitals are the chunkier five-row letters.', { lower: 'lowercase', caps: 'capitals' }, 'data');
     drop('banner.style', 'style', 'blocks are pixel letters drawn by the plugin. text is a big line in your font.', { blocks: 'blocks', text: 'big text' }, 'data');
-    slide('banner.size', 'block size', 'how big one pixel of a letter is. a ten-letter name is about 60 pixels wide.', 3, 14, 1, 'look', ' px');
     drop('banner.gradient', 'colour', 'rainbow runs across the six palette colours.',
       { rainbow: 'rainbow', accent: 'accent colour', pink: 'first palette colour', plain: 'plain text colour' }, 'data');
-    drop('banner.side', 'on the right', 'a smaller block of letters at the right end of the banner, so that side is not empty.', { clock: 'the time', date: 'the date', none: 'nothing' }, 'data');
-    drop('banner.align', 'position', 'only used when nothing is on the right.', { left: 'left', centre: 'centre' }, 'data');
+    drop('banner.align', 'position', '', { left: 'left', centre: 'centre' }, 'data');
 
     /* ── greeting ── */
     }
 
-    if (on('greeting')) {
+    if (on('hero')) {
     head('greeting');
     text('greeting.template', 'greeting', 'you can use {greeting} (good morning / afternoon / evening, or still up when it is late), {name}, {vault}, {time} and {date}.', '{greeting}, {name}.', 'data');
     tog('greeting.showDate', 'show the date', '', 'data');
-    tog('greeting.summary', 'summary line', 'notes, links and your current streak, in one line.', 'data');
+    tog('greeting.summary', 'vault summary line', 'notes, links and your current streak in this vault, in one line. off by default, because it is about one vault.', 'data');
     text('greeting.dateFormat', 'date format', 'moment.js tokens: dddd is the weekday, D the day, MMMM the month, YYYY the year. a middle dot is nice between them.', 'dddd · D MMMM YYYY', 'data');
     tog('greeting.progress.day', 'day progress bar', 'how far through the day you are.', 'data');
     tog('greeting.progress.week', 'week progress bar', '', 'data');
@@ -3675,15 +4433,6 @@ class HomeSettingTab extends PluginSettingTab {
     tog('shortcuts.hideMissing', 'hide unavailable', 'leaves out shortcuts whose command does not exist (for example, a core plugin you have switched off), instead of showing them dimmed.', 'data');
     tog('shortcuts.hotkeys', 'show hotkeys', 'the little ⌘ n badge, when the command has a hotkey.', 'data');
 
-    /* ── fastfetch ── */
-    }
-
-    if (on('calendar')) {
-    head('calendar');
-    drop('calendar.mark', 'mark days with', 'edits marks the days you edited notes (the same count as the streak). daily notes marks days that have a daily note.',
-      { activity: 'edits', daily: 'daily notes', none: 'nothing' }, 'data');
-    tog('calendar.weekNumbers', 'week numbers', '', 'data');
-    tog('calendar.arrows', 'month arrows', 'the ← → buttons for looking at other months. click the month name to come back.', 'data');
     }
 
     if (on('recent')) {
@@ -3714,7 +4463,7 @@ class HomeSettingTab extends PluginSettingTab {
     }
 
     if (on('tasks')) {
-    head('todo');
+    head('vault tasks');
     slide('tasks.count', 'how many to show', 'the most recently edited notes come first.', 1, 30, 1, 'data', '');
     slide('tasks.scan', 'notes to read', 'at most this many notes are opened to read the task text. the count at the top always covers the whole vault.', 5, 400, 5, 'data', '');
     tog('tasks.complete', 'click a box to tick it', 'ticks the box in the note itself. nothing is written unless the line is still exactly what the page shows.', 'data');
@@ -3801,21 +4550,20 @@ class HomeSettingTab extends PluginSettingTab {
     drop('terminal.style', 'look', 'window is a terminal window with a title bar and its own background. plain is just the text.', { window: 'window', plain: 'plain' }, 'build');
     tog('terminal.titleBar', 'title bar', 'the three dots and the title above the window. the first dot clears it.', 'build');
     text('terminal.title', 'title', 'you can use {user}, {host}, {path} and {vault}.', '{user}@{host}: {path}', 'build');
-    drop('terminal.position', 'where it lives', 'right is a tall pane beside the other sections, like a tmux pane, and it grows to the height of the page. bottom is a full-width window underneath. narrow tabs always use bottom.', { right: 'on the right', bottom: 'at the bottom' }, 'build');
-    slide('terminal.dockWidth', 'width on the right', 'how much of the page the pane takes, in percent.', 22, 55, 1, 'look', '%');
-    slide('terminal.height', 'scrollback height', 'lines of output shown above the prompt. on the right it is a minimum, and the pane grows to fit the page.', 2, 30, 1, 'look', '');
+    slide('terminal.height', 'scrollback height', 'lines of output shown above the prompt.', 2, 20, 1, 'look', '');
     drop('terminal.prompt', 'prompt', 'powerline adds a line of pills above the prompt: the folder you are in, the git branch, and whether the last command worked.',
       { powerline: 'powerline', compact: 'compact' }, 'build');
     tog('terminal.rprompt', 'time on the right', 'the time at the right end of the powerline.', 'build');
     tog('terminal.suggest', 'autosuggestions', 'grey suggestions from your history as you type. press → to take one.', 'look');
+    text('terminal.startup', 'startup commands', 'run once when the terminal first shows, so it has something in it. separate with commas, like weather, todo. leave empty for none.', 'weather, todo', 'build');
     tog('terminal.welcome', 'welcome line', 'the one-line hint before you have typed anything.', 'build');
     text('terminal.placeholder', 'placeholder', 'what the empty prompt says.', 'type a command · help', 'build');
-    drop('terminal.capture', 'add writes to', 'the add and todo add commands put a line in today\'s daily note, or in one inbox note.', { daily: "today's daily note", inbox: 'an inbox note' }, 'look');
+    drop('terminal.capture', 'add writes to', 'the add and tasks add commands put a line in today\'s daily note, or in one inbox note.', { daily: "today's daily note", inbox: 'an inbox note' }, 'look');
     text('terminal.inbox', 'inbox note', 'the path of the inbox note. it is made if it is missing.', 'inbox.md', 'look');
     }
 
     head('daily notes');
-    new UiSetting(containerEl).setDesc(ui('used by the daily note shortcut, the calendar, the journal entries count and the add command.'));
+    new UiSetting(containerEl).setDesc(ui('used by the daily note shortcut, the journal entries count and the add command.'));
     new UiSetting(containerEl)
       .setName('journal note format')
       .setDesc('for the journal entries count and the daily note command. leave empty to use the core daily notes plugin, or YYYY-MM-DD.')
@@ -3906,24 +4654,30 @@ class HomeSettingTab extends PluginSettingTab {
 
     /* ── card and layout ── */
     head('card and layout');
-    drop('layout.frame', 'frame', 'one card puts everything in a single bordered box. each section gives every section its own box. none has no borders at all.',
-      { one: 'one card', each: 'each section', none: 'none' }, 'look');
-    drop('layout.columns', 'columns', 'sections flow down each column, balanced, so there are no gaps. full-width sections span them all. narrow tabs use fewer columns.', { 1: 'one', 2: 'two', 3: 'three' }, 'look');
-    drop('layout.fit', 'when the page is taller than the tab', 'shrink scales the whole page down to fit, so it never scrolls. scroll leaves it full size and lets you scroll.',
-      { shrink: 'shrink to fit', scroll: 'scroll' }, 'look');
-    slide('layout.minScale', 'smallest size', 'shrinking stops here. if the page still does not fit, scrolling comes back so nothing is out of reach. turn a section off or lower the number of rows to get more room.', 30, 100, 5, 'look', '%');
-    slide('layout.width', 'maximum width', 'how wide the page gets in a big tab.', 420, 1400, 20, 'look', ' px');
-    slide('layout.gap', 'gap between sections', '', 0, 40, 1, 'look', ' px');
-    slide('layout.inner', 'card padding', 'space between a border and what is inside it.', 0, 40, 1, 'look', ' px');
-    drop('card.ring', 'border', "rainbow uses the palette. accent is obsidian's accent colour. subtle is your theme's border colour.",
+    drop('layout.frame', 'card style', 'soft is a quiet box around each card. ring is a rainbow ring around each. flat has no boxes.',
+      { soft: 'soft box', ring: 'rainbow ring', flat: 'flat' }, 'look');
+    drop('layout.columns', 'most columns', 'cards sit side by side up to this many. the page uses fewer when the tab is narrow, and fewer cards when it is short, so nothing ever needs scrolling.', { 1: 'one', 2: 'two', 3: 'three', 4: 'four' }, 'look');
+    slide('layout.sideWidth', 'terminal width', 'the most the terminal pane can take when the tab is wide.', 260, 700, 10, 'look', ' px');
+    slide('layout.gap', 'gap between cards', '', 0, 40, 1, 'look', ' px');
+    slide('layout.inner', 'card padding', 'space between a card edge and what is inside it.', 4, 40, 1, 'look', ' px');
+    drop('card.ring', 'ring colour', "only for the rainbow ring card style. rainbow uses the palette. accent is obsidian's accent colour. subtle is your theme's border colour.",
       { rainbow: 'rainbow', accent: 'accent colour', subtle: 'subtle', none: 'none' }, 'look');
     slide('card.ringWidth', 'border thickness', '', 1, 4, 1, 'look', ' px');
     slide('card.angle', 'rainbow angle', 'direction of the border gradient. 135 runs top-left to bottom-right.', 0, 345, 15, 'look', '°');
     slide('card.radius', 'corner radius', '', 0, 28, 1, 'look', ' px');
-    slide('card.pad', 'outer margin', 'space between the page and the edge of the tab.', 0, 48, 1, 'look', ' px');
-    drop('card.hAlign', 'horizontal position', 'only matters when the tab is wider than the page.', { centre: 'centre', left: 'left' }, 'look');
-    drop('card.vAlign', 'vertical position', 'centred when the page is shorter than the tab, or pinned to the top.', { centre: 'centre', top: 'top' }, 'look');
+    slide('card.pad', 'outer margin', 'space between the cards and the edge of the tab.', 0, 48, 1, 'look', ' px');
     slide('card.textSize', 'text size', 'percent of the normal size.', 80, 140, 5, 'look', '%');
+
+    /* ── sharing between vaults ── */
+    head('vaults');
+    new UiSetting(containerEl)
+      .setName('same page in every vault')
+      .setDesc(ui('the settings on this page are kept in ~/.mish-home/shared.json and used by every vault that has this plugin. your todos, countdowns and weather place are always shared. ignored folders, journal settings and the path pill text stay per vault.'))
+      .addToggle((t) => t.setValue(s.shareSettings !== false).onChange((v) => {
+        s.shareSettings = v;
+        plugin.persist();
+        if (v) plugin.shareSettings();
+      }));
 
     /* ── font ── */
     head('font');
@@ -3988,7 +4742,7 @@ class HomeSettingTab extends PluginSettingTab {
     head('reset');
     new UiSetting(containerEl)
       .setName('reset appearance')
-      .setDesc('puts every colour, pill shape, banner, streak and card option back to the default. sections, shortcuts, your name and your lists are not touched.')
+      .setDesc('puts every colour, pill shape, clock and card option back to the default. sections, shortcuts, your name and your lists are not touched.')
       .addButton((button) => button
         .setButtonText(ui('reset'))
         .setWarning()
