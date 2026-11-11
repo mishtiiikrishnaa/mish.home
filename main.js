@@ -287,8 +287,9 @@ const DEFAULT_SETTINGS = {
 
   /* the card */
   /* the page is a grid that fills the tab and never scrolls. columns = the most cards side by side.
-     frame: soft (a quiet box around each card) | ring (a rainbow ring around each) | flat (no boxes) */
-  layout: { frame: 'soft', columns: 4, gap: 12, inner: 14, sideWidth: 440 },
+     frame: soft (a quiet box around each card) | ring (a rainbow ring around each) | flat (no boxes)
+     heroBorder: the border design on the big clock card: none | ring | double | corners | dashed | stitched | rules */
+  layout: { frame: 'soft', heroBorder: 'double', columns: 4, gap: 12, inner: 14, sideWidth: 440 },
   card: { ring: 'rainbow', ringWidth: 1, angle: 135, radius: 14, pad: 14, textSize: 100 },
 };
 
@@ -308,6 +309,7 @@ const sanitise = (cfg) => {
   cfg.openIn = oneOf(cfg.openIn, ['tab', 'same'], 'tab');
   cfg.weekStart = oneOf(cfg.weekStart, ['mon', 'sun'], 'mon');
   cfg.pillShape = oneOf(cfg.pillShape, SHAPES, 'arrow');
+  cfg.layout.heroBorder = oneOf(cfg.layout.heroBorder, ['none', 'ring', 'double', 'corners', 'dashed', 'stitched', 'rules'], 'double');
 
   /* the section list: every section exactly once, unknown ones dropped */
   const seen = new Set();
@@ -2185,6 +2187,8 @@ class HomeView extends ItemView {
     applyVars(host, vars);
     setClassGroup(host, 'mh-shape-', s.pillShape);
     setClassGroup(host, 'mh-frame-', s.layout.frame);
+    setClassGroup(host, 'mh-hero-', s.layout.heroBorder);
+    host.classList.toggle('mh-hb', s.layout.heroBorder !== 'none');
     host.classList.toggle('mh-lower', s.lowercaseText);
     host.classList.toggle('mh-nocmd', !s.showCommands);
     if (this.leaf && this.leaf.updateHeader) this.leaf.updateHeader();     /* picks up a new tab title */
@@ -4656,6 +4660,8 @@ class HomeSettingTab extends PluginSettingTab {
     head('card and layout');
     drop('layout.frame', 'card style', 'soft is a quiet box around each card. ring is a rainbow ring around each. flat has no boxes.',
       { soft: 'soft box', ring: 'rainbow ring', flat: 'flat' }, 'look');
+    drop('layout.heroBorder', 'clock card border', 'the border on the big clock card at the top. none = just the card style above. double is a rainbow ring with a quiet line inside it. corners are four coloured brackets. dashed and stitched are lines a little way inside the card. rules are a rainbow line along the top and the bottom.',
+      { none: 'none', ring: 'rainbow ring', double: 'double line', corners: 'corners', dashed: 'dashed', stitched: 'stitched (dots)', rules: 'top and bottom rules' }, 'look');
     drop('layout.columns', 'most columns', 'cards sit side by side up to this many. the page uses fewer when the tab is narrow, and fewer cards when it is short, so nothing ever needs scrolling.', { 1: 'one', 2: 'two', 3: 'three', 4: 'four' }, 'look');
     slide('layout.sideWidth', 'terminal width', 'the most the terminal pane can take when the tab is wide.', 260, 700, 10, 'look', ' px');
     slide('layout.gap', 'gap between cards', '', 0, 40, 1, 'look', ' px');

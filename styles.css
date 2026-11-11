@@ -229,14 +229,89 @@ body.theme-light {
   mask-composite: exclude;
   pointer-events: none;
 }
-/* the first card gets a soft rainbow wash */
-.mh-frame-soft .mh-sec-hero,
-.mh-frame-ring .mh-sec-hero {
-  background: linear-gradient(120deg,
-    color-mix(in srgb, var(--mh-f0) 10%, transparent),
-    color-mix(in srgb, var(--mh-f4) 7%, transparent) 60%,
-    color-mix(in srgb, var(--mh-f5) 10%, transparent));
+/* the clock card has no gradient wash any more: it is a plain card like the rest, and gets a border
+   design instead (settings > card and layout > clock card border). main.js puts .mh-hb on the page
+   and .mh-hero-<design> next to it. every design draws on the card's ::before / ::after, and the
+   common rule below clears whatever the ring card style put there first. */
+.mh-hb .mh-sec-hero::before,
+.mh-hb .mh-sec-hero::after {
+  content: "";
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  -webkit-mask: none;
+  mask: none;
 }
+
+/* ring: a thin rainbow ring, the same as the rainbow ring card style (follows the ring settings) */
+.mh-hero-ring .mh-sec-hero::before,
+.mh-hero-double .mh-sec-hero::before {
+  inset: 0;
+  padding: var(--mh-ring-w, 1px);
+  background: var(--mh-ring-bg, linear-gradient(
+    var(--mh-angle, 135deg),
+    var(--mh-f0), var(--mh-f1), var(--mh-f2), var(--mh-f3), var(--mh-f4), var(--mh-f5)
+  ));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* double: the rainbow ring, and a second, quieter line just inside it */
+.mh-hero-double .mh-sec-hero::after {
+  inset: 5px;
+  border: 1px solid color-mix(in srgb, var(--mh-f4) 42%, transparent);
+  border-radius: calc(var(--mh-radius, 14px) - 5px);
+}
+
+/* corners: four brackets in the corners, one rainbow colour each, like a viewfinder */
+.mh-hero-corners .mh-sec-hero::before {
+  inset: 9px;
+  border-radius: 0;
+  background:
+    linear-gradient(var(--mh-f0), var(--mh-f0)) top left / 26px 2px no-repeat,
+    linear-gradient(var(--mh-f0), var(--mh-f0)) top left / 2px 26px no-repeat,
+    linear-gradient(var(--mh-f2), var(--mh-f2)) top right / 26px 2px no-repeat,
+    linear-gradient(var(--mh-f2), var(--mh-f2)) top right / 2px 26px no-repeat,
+    linear-gradient(var(--mh-f4), var(--mh-f4)) bottom right / 26px 2px no-repeat,
+    linear-gradient(var(--mh-f4), var(--mh-f4)) bottom right / 2px 26px no-repeat,
+    linear-gradient(var(--mh-f5), var(--mh-f5)) bottom left / 26px 2px no-repeat,
+    linear-gradient(var(--mh-f5), var(--mh-f5)) bottom left / 2px 26px no-repeat;
+}
+
+/* dashed: one dashed line a little way inside the card */
+.mh-hero-dashed .mh-sec-hero::before {
+  inset: 6px;
+  border: 1px dashed color-mix(in srgb, var(--mh-f0) 70%, transparent);
+  border-radius: calc(var(--mh-radius, 14px) - 6px);
+}
+
+/* stitched: a row of dots, like stitching on a sampler */
+.mh-hero-stitched .mh-sec-hero::before {
+  inset: 7px;
+  border: 2px dotted color-mix(in srgb, var(--mh-f1) 60%, transparent);
+  border-radius: calc(var(--mh-radius, 14px) - 7px);
+}
+
+/* rules: a rainbow rule along the top and along the bottom edge */
+.mh-hero-rules .mh-sec-hero::before,
+.mh-hero-rules .mh-sec-hero::after {
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--mh-f0), var(--mh-f1), var(--mh-f2), var(--mh-f3), var(--mh-f4), var(--mh-f5));
+}
+.mh-hero-rules .mh-sec-hero::before { top: 0; }
+.mh-hero-rules .mh-sec-hero::after { bottom: 0; }
+
+/* with "flat" cards the clock card has no padding to speak of: give a border room to breathe */
+.mh-hb.mh-frame-flat .mh-sec-hero { padding-left: var(--mh-inner, 14px); padding-right: var(--mh-inner, 14px); }
 
 /* the little coloured pill at the top of a card, the same shape as the prompt */
 .mh-head {
@@ -282,6 +357,7 @@ body.theme-light {
 /* — powerline starship prompt (same as mish.music) — */
 .mh-bar {
   flex: 0 0 auto;
+  align-self: center;            /* the powerline prompt sits in the middle of the page */
   display: flex;
   justify-content: flex-start;
   align-items: center;
