@@ -121,6 +121,11 @@
         "id": "shell",
         "on": true,
         "wide": true
+      },
+      {
+        "id": "calendar",
+        "on": true,
+        "wide": false
       }
     ],
     "banner": {
@@ -130,7 +135,8 @@
       "letters": "lower",
       "size": 6,
       "gradient": "rainbow",
-      "align": "left"
+      "align": "left",
+      "side": "clock"
     },
     "greeting": {
       "summary": true,
@@ -238,15 +244,17 @@
       "style": "window",
       "titleBar": true,
       "title": "{user}@{host}: {path}",
+      "position": "right",
+      "dockWidth": 36,
       "height": 4,
       "prompt": "powerline",
       "rprompt": true,
       "suggest": true,
       "welcome": true,
-      "startup": "stats",
       "placeholder": "type a command · help",
       "capture": "daily",
-      "inbox": "inbox.md"
+      "inbox": "inbox.md",
+      "startup": "stats"
     },
     "daily": {
       "folder": "",
@@ -277,9 +285,19 @@
   },
   "focusLog": {},
   "opened": [
+    "projects/website/old/failed/tests.md",
+    "notes/research.md",
+    "notes/ideas.md",
+    "notes/programming.md",
+    "notes/topics.md",
+    "attachments/image.png",
+    "attachments/diagram.png",
+    "templates/daily note.md",
     "file:/Users/mishti/Documents/testing/test.md"
   ],
-  "activity": {},
+  "activity": {
+    "2026-11-11": 2
+  },
   "history": [
     "help"
   ]

@@ -113,13 +113,6 @@ body.theme-light {
 /* ═══════════════════════════════════════════════════════════════════════
    mish.home · page styles
    colours come from the theme (--vf-*), falling back to the palette above.
-
-   how the page is built, top to bottom:
-     .mh-scroll   the tab: scrolls, and sets the margin around the card
-     .mh          the card: rainbow ring, quiet surface, one container for the media queries
-     .mh-bar      the powerline prompt
-     .mh-layout   [ .mh-main > .mh-grid of panes ] [ .mh-side: the terminal, when it is a pane ]
-     .mh-sec      one pane: a powerline header (.mh-ph), then its body
    ═══════════════════════════════════════════════════════════════════════ */
 
 .workspace-leaf-content[data-type="mh-home-view"].mh-nohead > .view-header { display: none; }
@@ -145,8 +138,6 @@ body.theme-light {
   --mh-rule: var(--mz-rule);
   --mh-hover: var(--mz-hover);
   --mh-tree: var(--mz-tree-line);
-  /* an opaque quiet fill, for pills that sit beside the rainbow ones */
-  --mh-chip: color-mix(in srgb, var(--mh-fg) 13%, var(--background-primary, #1b1b1f));
 
   background: transparent !important;
   position: relative;
@@ -156,28 +147,27 @@ body.theme-light {
 }
 
 .mh-lower { text-transform: lowercase; }
-.mh-keep { text-transform: none; }
 
-/* ── the tab: the only thing that scrolls ───────────────────────────────── */
 .mh-scroll {
+  background: transparent;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  display: flex;                  /* margin: auto on the card centres it, and never clips the top */
-  padding: var(--mh-pad, 20px);
+  display: flex;                 /* margin:auto on the card centres it both ways */
+  padding: var(--mh-pad, 16px);
   overflow-x: hidden;
   overflow-y: auto;
   container-type: inline-size;
   container-name: mhs;
 }
-.mh-scroll::-webkit-scrollbar { width: 5px; height: 0; }
+/* thin rainbow scrollbar */
+.mh-scroll::-webkit-scrollbar { width: 4px; height: 0; }
 .mh-scroll::-webkit-scrollbar-track { background: transparent; }
 .mh-scroll::-webkit-scrollbar-thumb {
-  border-radius: 3px;
+  border-radius: 2px;
   background: linear-gradient(var(--mh-f0), var(--mh-f1), var(--mh-f2), var(--mh-f3), var(--mh-f4), var(--mh-f5));
 }
 
-/* ── the card ───────────────────────────────────────────────────────────── */
 .mh,
 .mh * { box-sizing: border-box; }
 .mh [hidden] { display: none !important; }
@@ -189,28 +179,28 @@ body.theme-light {
   line-height: 1.5;
   letter-spacing: 0.005em;
   position: relative;
-  isolation: isolate;             /* the pills' stacking order stays inside the card */
   width: min(100%, var(--mh-w, 860px));
   flex: 0 0 auto;
   margin: var(--mh-mt, auto) auto auto var(--mh-ml, auto);
   text-align: left;
   user-select: text;
-  container-type: inline-size;
-  container-name: mhc;
 }
 
-/* a thin ring, cut out with a mask so the inside stays see-through.
-   "one card" rings the whole page, "each section" rings every pane. */
+/* thin rainbow ring, cut out with a mask so the card stays see-through.
+   "one card" rings the whole page, "each section" rings every section. */
 .mh-frame-one .mh,
-.mh-frame-each .mh-sec:not(.mh-sec-banner):not(.mh-sec-shell) {
-  border-radius: var(--mh-radius, 14px);
+.mh-frame-each .mh-sec {
+  position: relative;
+  border-radius: var(--mh-radius, 12px);
 }
+.mh-frame-one .mh { padding: var(--mh-inner, 16px); }
+.mh-frame-each .mh-sec { padding: var(--mh-inner, 16px); }
 .mh-frame-one .mh::before,
-.mh-frame-each .mh-sec:not(.mh-sec-banner):not(.mh-sec-shell)::before {
+.mh-frame-each .mh-sec::before {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 20;
+  z-index: 6;
   padding: var(--mh-ring-w, 1px);
   border-radius: inherit;
   background: var(--mh-ring-bg, linear-gradient(
@@ -223,189 +213,106 @@ body.theme-light {
   mask-composite: exclude;
   pointer-events: none;
 }
-.mh-frame-one .mh {
-  padding: calc(var(--mh-inner, 18px) * 1.15);
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--mh-fg) 4%, transparent),
-    color-mix(in srgb, var(--mh-fg) 2%, transparent) 180px);
-  box-shadow: 0 32px 70px -44px var(--mz-shadow);
-}
+.mh-frame-each .mh-bar { margin-bottom: var(--mh-gap, 16px); }
 
-/* ═══ the powerline ═══════════════════════════════════════════════════════
-   one segment is a rectangle with an arrow tip cut into its right edge. each segment is pulled
-   left by the width of the tip, so the next one starts under it, and each one paints ABOVE the
-   next (main.js sets --i, and the z-index falls as it rises). that is what makes the arrow
-   visible: its point lies over the next segment's flat edge, and the next colour shows in the
-   two notches beside it. the first segment has a round left end, the last a round right end.
-   --h is the height, --tip the depth of the arrow. half the height is a true 90 degree point. */
-.mh-seg {
-  --h: var(--mh-pl-h, 24px);
-  --tip: var(--mh-pl-tip, 11px);
+/* — sections flow down balanced columns: no gaps, and full-width ones span them all — */
+.mh { container-type: inline-size; container-name: mhc; }
+.mh-grid { column-count: var(--mh-cols, 2); column-gap: calc(var(--mh-gap, 16px) * 1.5); }
+.mh-sec {
+  min-width: 0;
   position: relative;
-  z-index: calc(12 - var(--i, 0));
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  height: var(--h);
-  padding: 0 calc(var(--tip) + 6px) 0 8px;
-  font-size: calc(11.5px * var(--mh-scale, 1));
-  line-height: var(--h);
-  white-space: nowrap;
-  color: var(--mh-ink);
-  clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%);
+  break-inside: avoid;
+  margin-bottom: var(--mh-gap, 16px);
 }
-.mh-seg + .mh-seg { margin-left: calc(var(--tip) * -1); padding-left: calc(var(--tip) + 8px); }
-.mh-seg:first-child { padding-left: 13px; border-radius: calc(var(--h) / 2) 0 0 calc(var(--h) / 2); }
-.mh-seg:last-child { padding-right: 14px; clip-path: none; border-radius: 0 calc(var(--h) / 2) calc(var(--h) / 2) 0; }
-.mh-seg:first-child:last-child { border-radius: calc(var(--h) / 2); }
+.mh-sec.is-wide { column-span: all; }
+.mh-grid > .mh-sec:last-child { margin-bottom: 0; }
+.mh-grid > .mh-hint { column-span: all; }
+/* the column count follows the width of the card itself, not the tab, because a shrunk page is laid out wider */
 
-/* the prompt at the top of the page */
+
+/* — powerline starship prompt (same as mish.music) — */
 .mh-bar {
-  --mh-pl-h: 24px;
-  --mh-pl-tip: 11px;
   display: flex;
+  justify-content: flex-start;
   align-items: center;
   flex-wrap: nowrap;
   width: max-content;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  margin: 0 0 calc(var(--mh-gap, 18px) * 1.15);
+  margin: 0 0 var(--mh-gap, 16px);
 }
 .mh-bar.is-empty { display: none; }
+
+.mh-seg {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 0 16px 0 9px;
+  font-size: calc(11.5px * var(--mh-scale, 1));
+  line-height: 22px;
+  white-space: nowrap;
+  color: var(--mh-ink);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+}
+.mh-seg + .mh-seg { margin-left: -9px; padding-left: 18px; }
+.mh-seg:first-child { border-radius: 11px 0 0 11px; padding-left: 11px; }
+.mh-seg:last-child { clip-path: none; border-radius: 0 11px 11px 0; padding-right: 12px; }
+.mh-seg:first-child:last-child { border-radius: 11px; }
+
 .mh-user { background: var(--mh-f0); }
 .mh-path { background: var(--mh-f1); }
 .mh-git  { background: var(--mh-f2); }
-.mh-time { background: var(--mh-f5); }
-/* the little >>> bridge between the path and the clock: three thin chevrons, yellow, green, blue */
-.mh-seg.mh-ch { width: calc(var(--tip) * 2); padding: 0; }
+.mh-seg.mh-ch { width: 18px; padding: 0; }
 .mh-ch1 { background: var(--mh-f2); }
 .mh-ch2 { background: var(--mh-f3); }
 .mh-ch3 { background: var(--mh-f4); }
+.mh-time { background: var(--mh-f5); }
 
-/* pill shapes (settings): arrow is the powerline above. round and flat drop the tips and the
-   bridge, and use gaps (round) or butt the pills together (flat). */
-.mh-root.mh-shape-round .mh-seg,
-.mh-root.mh-shape-flat .mh-seg {
-  clip-path: none;
-  padding: 0 11px;
-  margin-left: 0;
-  border-radius: calc(var(--h) / 2);
-}
-.mh-root.mh-shape-flat .mh-seg { border-radius: 0; }
-.mh-root.mh-shape-round .mh-seg + .mh-seg { margin-left: 4px; }
-.mh-root.mh-shape-round .mh-ch,
-.mh-root.mh-shape-flat .mh-ch { display: none; }
+/* pill shapes (settings) */
+.mh-shape-round .mh-seg,
+.mh-shape-round .mh-seg:first-child,
+.mh-shape-round .mh-seg:last-child,
+.mh-shape-flat .mh-seg,
+.mh-shape-flat .mh-seg:first-child,
+.mh-shape-flat .mh-seg:last-child { clip-path: none; padding: 0 11px; margin-left: 0; }
+.mh-shape-round .mh-seg,
+.mh-shape-round .mh-seg:first-child,
+.mh-shape-round .mh-seg:last-child { border-radius: 11px; }
+.mh-shape-flat .mh-seg,
+.mh-shape-flat .mh-seg:first-child,
+.mh-shape-flat .mh-seg:last-child { border-radius: 0; }
+.mh-shape-round .mh-seg + .mh-seg { margin-left: 4px; }
+.mh-shape-round .mh-ch,
+.mh-shape-flat .mh-ch { display: none; }
 
-/* ═══ the layout ══════════════════════════════════════════════════════════ */
-.mh-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: calc(var(--mh-gap, 18px) * 1.5);
-  align-items: stretch;
-}
-.mh-split-on .mh-layout {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, min(var(--mh-side, 400px), 38%));
-}
-/* a narrow card: the terminal drops under the panes */
-@container mhc (max-width: 1040px) {
-  .mh-split-on .mh-layout { grid-template-columns: minmax(0, 1fr); }
-}
+/* — colour helpers — */
+.mh-c0 { color: var(--mh-t0); } .mh-c1 { color: var(--mh-t1); } .mh-c2 { color: var(--mh-t2); }
+.mh-c3 { color: var(--mh-t3); } .mh-c4 { color: var(--mh-t4); } .mh-c5 { color: var(--mh-t5); }
+.mh-t0 { color: var(--mh-t0); } .mh-t1 { color: var(--mh-t1); } .mh-t3 { color: var(--mh-t3); }
 
-/* the panes reflow by the width they actually have: three, then two, then one */
-.mh-main { min-width: 0; container-type: inline-size; container-name: mhm; }
-.mh-grid {
-  --g: 1;
-  display: grid;
-  grid-template-columns: repeat(var(--g), minmax(0, 1fr));
-  grid-auto-flow: row dense;
-  gap: var(--mh-gap, 18px);
-  align-items: stretch;
-}
-.mh-cols-2 .mh-grid { --g: 2; }
-.mh-cols-3 .mh-grid { --g: 3; }
-@container mhm (max-width: 940px) { .mh-cols-3 .mh-grid { --g: 2; } }
-@container mhm (max-width: 560px) { .mh-cols-2 .mh-grid, .mh-cols-3 .mh-grid { --g: 1; } }
-
-.mh-sec { position: relative; min-width: 0; display: flex; flex-direction: column; }
-.mh-sec.is-wide,
-.mh-grid > .mh-hint { grid-column: 1 / -1; }
-.mh-body { min-width: 0; flex: 1 1 auto; }
-
-/* boxed panes: a hairline outline and a very faint fill, like tmux panes. the banner and the
-   terminal draw themselves, so they are never boxed. */
-.mh-panes-boxed .mh-sec:not(.mh-sec-banner):not(.mh-sec-shell),
-.mh-frame-each .mh-sec:not(.mh-sec-banner):not(.mh-sec-shell) {
-  padding: 13px 15px 15px;
-  border-radius: calc(var(--mh-radius, 14px) * 0.8);
-  background: color-mix(in srgb, var(--mh-fg) 2.5%, transparent);
-}
-.mh-panes-boxed .mh-sec:not(.mh-sec-banner):not(.mh-sec-shell) { border: 1px solid var(--mh-rule); }
-.mh-frame-each .mh-sec:not(.mh-sec-banner):not(.mh-sec-shell) { border: 0; }
-
-/* ── a pane's header: a small powerline ─────────────────────────────────── */
-.mh-ph {
-  --mh-pl-h: 20px;
-  --mh-pl-tip: 9px;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  margin: 0 0 12px;
-}
-.mh-ph .mh-seg { font-size: calc(10.5px * var(--mh-scale, 1)); }
-.mh-ph-a { color: var(--mh-ink); }
-.mh-ph-b {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  gap: 0.9ch;
-  background: var(--mh-chip);
-  color: var(--mh-dim);
-}
-.mh-ph-b .mh-exe { flex: 0 0 auto; }
-.mh-ph-b .mh-arg { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-
-/* the plain alternative: the ❯ command line, with a hairline running out to the right */
+/* — command lines — */
 .mh-cmd {
   display: flex;
   align-items: center;
-  gap: 0.7ch;
-  margin: 0 0 10px;
-  font-size: calc(11px * var(--mh-scale, 1));
-  letter-spacing: 0.02em;
-  color: var(--mh-dim);
+  height: 18px;
+  margin: 0 0 6px;
+  font-size: calc(11.5px * var(--mh-scale, 1));
   white-space: nowrap;
   overflow: hidden;
 }
-.mh-cmd::after {
-  content: "";
-  flex: 1 1 auto;
-  min-width: 14px;
-  height: 1px;
-  margin-left: 12px;
-  background: linear-gradient(90deg, var(--mh-rule), transparent 88%);
-}
-.mh-chev { color: var(--mh-t3); opacity: 0.85; }
-.mh-exe { color: color-mix(in oklab, var(--mh-t3) 70%, var(--mh-fg)); }
+.mh-chev, .mh-exe { color: var(--mh-t3); }
 .mh-arg { color: var(--mh-dim); }
-
-/* ── colour helpers ─────────────────────────────────────────────────────── */
-.mh-c0, .mh-t0 { color: var(--mh-t0); } .mh-c1, .mh-t1 { color: var(--mh-t1); }
-.mh-c2, .mh-t2 { color: var(--mh-t2); } .mh-c3, .mh-t3 { color: var(--mh-t3); }
-.mh-c4, .mh-t4 { color: var(--mh-t4); } .mh-c5, .mh-t5 { color: var(--mh-t5); }
-.mh-dim { color: var(--mh-dim); } .mh-fg { color: var(--mh-fg); }
-.mh-bg0 { background: var(--mh-f0); } .mh-bg1 { background: var(--mh-f1); } .mh-bg2 { background: var(--mh-f2); }
-.mh-bg3 { background: var(--mh-f3); } .mh-bg4 { background: var(--mh-f4); } .mh-bg5 { background: var(--mh-f5); }
-.mh-bgdim { background: var(--mh-rule); } .mh-bgfg { background: var(--mh-fg); }
-.mh-k { color: var(--mh-t3); font-weight: 600; min-width: 4.5ch; }
-.mh-today { background: var(--mh-f0); color: var(--mh-ink); border-radius: 3px; }
-.is-link { cursor: pointer; }
-.is-link:hover { text-decoration: underline; }
+.mh-chev + .mh-exe { margin-left: 1ch; }
+.mh-exe + .mh-arg { margin-left: 1ch; }
+.mh-nocmd .mh-cmd { display: none; }
 
 .mh-hint { color: var(--mh-dim); margin: 2px 0; }
 .mh-hint.is-bad { color: var(--mh-t0); }
 
-/* ═══ banner ══════════════════════════════════════════════════════════════ */
+/* — banner — */
 .mh-sec-banner .mh-body.is-centre { display: flex; justify-content: center; }
 .mh-banner {
   display: block;
@@ -427,12 +334,15 @@ body.theme-light {
 .mh-grad-pink    { background-image: linear-gradient(var(--mh-f0), var(--mh-f0)); }
 .mh-grad-plain   { background-image: linear-gradient(var(--mh-fg), var(--mh-fg)); }
 
-/* ═══ greeting ════════════════════════════════════════════════════════════ */
-.mh-hello { font-size: calc(20px * var(--mh-scale, 1)); letter-spacing: -0.01em; line-height: 1.3; color: var(--mh-t0); }
-.mh-date { font-size: 0.96em; color: var(--mh-dim); margin-bottom: 6px; }
-.mh-gsum,
-.mh-sum { color: var(--mh-dim); margin-bottom: 6px; }
-.mh-prog { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+/* — greeting — */
+.mh-hello { font-size: calc(19px * var(--mh-scale, 1)); line-height: 1.25; color: var(--mh-t0); }
+.mh-date { color: var(--mh-dim); margin-bottom: 4px; }
+.mh-prog {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
 .mh-pk { flex: 0 0 6ch; color: var(--mh-dim); }
 .mh-pbar { display: flex; gap: 2px; flex: 1 1 auto; min-width: 0; max-width: 360px; }
 .mh-pbar i {
@@ -440,24 +350,23 @@ body.theme-light {
   flex: 1 1 0;
   min-width: 0;
   height: var(--mh-seek, 9px);
-  border-radius: 2px;
+  border-radius: 1px;
   background: var(--mh-rule);
-  transition: background 120ms ease, transform 80ms ease;
 }
-.mh-pbar i.on.mh-c0 { background: var(--mh-f0); }
-.mh-pbar i.on.mh-c1 { background: var(--mh-f1); }
-.mh-pbar i.on.mh-c2 { background: var(--mh-f2); }
-.mh-pbar i.on.mh-c3 { background: var(--mh-f3); }
-.mh-pbar i.on.mh-c4 { background: var(--mh-f4); }
-.mh-pbar i.on.mh-c5 { background: var(--mh-f5); }
-.mh-pbar i.on.mh-lv-ok { background: var(--mh-f3); }
-.mh-pbar i.on.mh-lv-warn { background: var(--mh-f2); }
-.mh-pbar i.on.mh-lv-bad { background: var(--mh-f0); }
-.mh-pbar i.on:hover { transform: scaleY(1.15); }
+.mh-pbar i.on.mh-c0 { background: var(--mh-f0); } .mh-pbar i.on.mh-c1 { background: var(--mh-f1); }
+.mh-pbar i.on.mh-c2 { background: var(--mh-f2); } .mh-pbar i.on.mh-c3 { background: var(--mh-f3); }
+.mh-pbar i.on.mh-c4 { background: var(--mh-f4); } .mh-pbar i.on.mh-c5 { background: var(--mh-f5); }
 .mh-pv { flex: 0 0 4ch; text-align: right; color: var(--mh-dim); }
 
-/* ═══ shortcuts ═══════════════════════════════════════════════════════════ */
-.mh-sc { display: flex; align-items: center; gap: 1ch; min-height: 24px; cursor: pointer; white-space: nowrap; }
+/* — shortcuts: like the new-tab screen — */
+.mh-sc {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  min-height: 24px;
+  cursor: pointer;
+  white-space: nowrap;
+}
 .mh-sc:hover .mh-sclabel { color: var(--mh-t0); }
 .mh-sclabel { color: var(--mh-fg); overflow: hidden; text-overflow: ellipsis; }
 .mh-kbd {
@@ -471,21 +380,52 @@ body.theme-light {
 .mh-sc.is-missing { opacity: 0.4; }
 .mh-sec-shortcuts .mh-body.is-row { display: flex; flex-wrap: wrap; gap: 2px 2.5ch; }
 
-/* ═══ eza-style tree (recent, pinned): the lines are drawn by css ═══════════ */
-.mh-row { display: flex; align-items: center; min-width: 0; height: 22px; white-space: nowrap; cursor: pointer; border-radius: 4px; }
+.mh-k { color: var(--mh-t0); }
+
+/* — eza-style tree (recent, pinned) — the lines are drawn by css, so no font needs box characters — */
+.mh-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 22px;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 4px;
+}
 .mh-row:hover { background: var(--mh-hover); }
 .mh-row.is-missing { opacity: 0.45; cursor: default; }
 .mh-tl { position: relative; flex: 0 0 3ch; align-self: stretch; }
-.mh-tl::before { content: ""; position: absolute; left: 0.6ch; top: 0; bottom: 0; border-left: 1px solid var(--mh-tree); }
+.mh-tl::before {
+  content: "";
+  position: absolute;
+  left: 0.6ch;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--mh-tree);
+}
 .mh-row.is-last .mh-tl::before { bottom: 50%; }
-.mh-tl::after { content: ""; position: absolute; left: 0.6ch; right: 0.4ch; top: 50%; border-top: 1px solid var(--mh-tree); }
+.mh-tl::after {
+  content: "";
+  position: absolute;
+  left: 0.6ch;
+  right: 0.4ch;
+  top: 50%;
+  border-top: 1px solid var(--mh-tree);
+}
 .mh-bullet { flex: 0 0 2ch; }
 .mh-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mh-sub { flex: 0 1 auto; max-width: 40%; margin-left: 1ch; overflow: hidden; text-overflow: ellipsis; color: var(--mh-dim); }
 .mh-age { flex: 0 0 4ch; margin-left: 1ch; text-align: right; color: var(--mh-dim); }
 
-/* ═══ todo ════════════════════════════════════════════════════════════════ */
-.mh-task { display: flex; align-items: baseline; gap: 1ch; min-height: 22px; white-space: nowrap; }
+/* — todo — */
+.mh-sum { color: var(--mh-dim); margin-bottom: 4px; }
+.mh-task {
+  display: flex;
+  align-items: baseline;
+  gap: 1ch;
+  min-height: 22px;
+  white-space: nowrap;
+}
 .mh-box { flex: 0 0 auto; color: var(--mh-t3); cursor: pointer; }
 .mh-box:hover { color: var(--mh-t0); }
 .mh-box.is-static { cursor: default; }
@@ -495,7 +435,7 @@ body.theme-light {
 .mh-tnote { flex: 0 1 auto; max-width: 35%; overflow: hidden; text-overflow: ellipsis; color: var(--mh-dim); }
 .mh-task.is-done .mh-ttext { text-decoration: line-through; opacity: 0.5; }
 
-/* ═══ streak grid ═════════════════════════════════════════════════════════ */
+/* — streak grid — */
 .mh-heatwrap { display: flex; gap: 6px; align-items: flex-start; }
 .mh-heatcol { min-width: 0; }
 .mh-months {
@@ -525,12 +465,12 @@ body.theme-light {
 }
 .mh-heatwrap:has(.mh-months) .mh-days { margin-top: 17px; }
 .mh-heat {
-  --mh-hc: var(--mh-f3);
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(7, var(--mh-cell, 11px));
   grid-auto-columns: var(--mh-cell, 11px);
   gap: var(--mh-cgap, 3px);
+  --mh-hc: var(--mh-f3);
 }
 .mh-heat-pink   { --mh-hc: var(--mh-f0); } .mh-heat-peach { --mh-hc: var(--mh-f1); }
 .mh-heat-yellow { --mh-hc: var(--mh-f2); } .mh-heat-green { --mh-hc: var(--mh-f3); }
@@ -546,19 +486,45 @@ body.theme-light {
 .mh-heat-rainbow .mh-cell.lv-3 { background: var(--mh-f3); }
 .mh-heat-rainbow .mh-cell.lv-4 { background: var(--mh-f0); }
 
-/* ═══ fortune ═════════════════════════════════════════════════════════════ */
+/* — fortune — */
 .mh-quote { color: var(--mh-t1); overflow-wrap: anywhere; }
 
-/* ═══ calendar ════════════════════════════════════════════════════════════ */
+/* settings tab: the long text boxes go full width under their label */
+.mh-setting-area { flex-wrap: wrap; }
+.mh-setting-area .setting-item-control { width: 100%; }
+.mh-setting-area textarea { font-family: var(--font-monospace); font-size: 12px; }
+
+/* ═══ no scrolling: the page is scaled to fit by main.js (see fit()) ═══ */
+.mh-fit .mh-scroll { overflow-y: hidden; align-items: flex-start; }
+.mh-fit .mh-scroll.is-overflow { overflow-y: auto; }
+.mh-keep { text-transform: none; }
+
+/* ═══ colour classes used by the new sections and terminal output ═══ */
+.mh-t2 { color: var(--mh-t2); } .mh-t4 { color: var(--mh-t4); } .mh-t5 { color: var(--mh-t5); }
+.mh-dim { color: var(--mh-dim); } .mh-fg { color: var(--mh-fg); }
+.mh-bgdim { background: var(--mh-rule); } .mh-bgfg { background: var(--mh-fg); }
+.mh-today { background: var(--mh-f0); color: var(--mh-ink); border-radius: 3px; }
+.mh-gsum { color: var(--mh-dim); margin-bottom: 4px; }
+.mh-pbar i.on.mh-lv-ok { background: var(--mh-f3); }
+.mh-pbar i.on.mh-lv-warn { background: var(--mh-f2); }
+.mh-pbar i.on.mh-lv-bad { background: var(--mh-f0); }
+
+/* — calendar — */
 .mh-calhead { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .mh-caltitle { color: var(--mh-t0); cursor: pointer; }
 .mh-calbtn { color: var(--mh-dim); cursor: pointer; padding: 0 5px; border-radius: 4px; }
 .mh-calbtn:hover { color: var(--mh-fg); background: var(--mh-hover); }
-.mh-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; max-width: 24em; text-align: center; }
+.mh-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  row-gap: 2px;
+  max-width: 24em;
+  text-align: center;
+}
 .mh-cal.has-wk { grid-template-columns: 3ch repeat(7, minmax(0, 1fr)); }
 .mh-calwd { color: var(--mh-dim); font-size: 0.9em; }
 .mh-calwk { color: var(--mh-dim); font-size: 0.85em; opacity: 0.6; }
-.mh-day { position: relative; line-height: 1.55; border-radius: 5px; cursor: pointer; }
+.mh-day { position: relative; line-height: 1.75; border-radius: 5px; cursor: pointer; }
 .mh-day:hover { background: var(--mh-hover); }
 .mh-day.is-out { color: var(--mh-dim); opacity: 0.4; }
 .mh-day.has-note { color: var(--mh-t3); }
@@ -576,7 +542,7 @@ body.theme-light {
 .mh-day.is-today { background: var(--mh-f0); color: var(--mh-ink); opacity: 1; }
 .mh-day.is-today::after { background: var(--mh-ink); }
 
-/* ═══ focus timer ═════════════════════════════════════════════════════════ */
+/* — focus timer — */
 .mh-fotop { display: flex; align-items: baseline; gap: 12px; }
 .mh-fotime { font-size: calc(26px * var(--mh-scale, 1)); line-height: 1.15; color: var(--mh-fg); }
 .mh-fobar { margin: 6px 0; max-width: none; }
@@ -587,21 +553,34 @@ body.theme-light {
 .mh-btn:hover { color: var(--mh-t0); }
 .mh-fosum { color: var(--mh-dim); margin-top: 4px; }
 
-/* ═══ system ══════════════════════════════════════════════════════════════ */
-.mh-sys { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 2ch; row-gap: 6px; align-items: center; }
+/* — system — */
+.mh-sys {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 2ch;
+  row-gap: 4px;
+  align-items: center;
+}
 .mh-sv { display: flex; align-items: center; gap: 1ch; min-width: 0; }
-.mh-sv .mh-pbar { flex: 1 1 0; max-width: 260px; }
-.mh-sv .mh-pbar i { height: 10px; border-radius: 2px; transition: transform 80ms ease; }
-.mh-sv .mh-pbar i.on:hover { transform: scaleY(1.2); }
-.mh-sval { flex: 0 0 auto; color: var(--mh-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mh-sv .mh-pbar { flex: 1 1 0; max-width: 220px; }
+.mh-sval { flex: 0 0 auto; color: var(--mh-dim); white-space: nowrap; }
 
-/* ═══ tags and folders ════════════════════════════════════════════════════ */
-.mh-brow { display: flex; align-items: center; gap: 1ch; min-width: 0; height: 22px; white-space: nowrap; cursor: pointer; border-radius: 4px; }
+/* — tags and folders — */
+.mh-brow {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  min-width: 0;
+  height: 22px;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 4px;
+}
 .mh-brow:hover { background: var(--mh-hover); }
 .mh-minibar { flex: 0 0 11ch; max-width: none; }
 .mh-minibar i { height: 7px; }
 
-/* ═══ random note ═════════════════════════════════════════════════════════ */
+/* — random note — */
 .mh-rtitle { cursor: pointer; margin-bottom: 2px; }
 .mh-rtitle:hover { text-decoration: underline; }
 .mh-rline { display: flex; gap: 1.5ch; cursor: pointer; }
@@ -609,11 +588,11 @@ body.theme-light {
 .mh-rtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mh-rline:hover .mh-rtext { color: var(--mh-t0); }
 
-/* ═══ git log ═════════════════════════════════════════════════════════════ */
+/* — git log — */
 .mh-gl { display: flex; align-items: baseline; gap: 1.5ch; min-height: 22px; white-space: nowrap; }
 .mh-glmsg { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* ═══ the terminal ════════════════════════════════════════════════════════ */
+/* ═══ the terminal ═══ */
 .mh-term {
   border: 1px solid var(--mh-rule);
   border-radius: 10px;
@@ -652,9 +631,17 @@ body.theme-light {
 .mh-tcmd { color: var(--mh-fg); }
 .mh-tcode .mh-hl-bad { color: var(--mh-t0); }
 .mh-chev.is-bad { color: var(--mh-t0); }
+.is-link { cursor: pointer; }
+.is-link:hover { text-decoration: underline; }
 
 /* the tab-completion menu */
-.mh-menu { display: none; flex-wrap: wrap; gap: 4px 6px; padding: 5px 10px; border-top: 1px solid var(--mh-rule); }
+.mh-menu {
+  display: none;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--mh-rule);
+}
 .mh-menu.is-open { display: flex; }
 .mh-chip { padding: 0 7px; border-radius: 6px; background: var(--mh-hover); color: var(--mh-fg); }
 .mh-chip.is-sel { background: var(--mh-f3); color: var(--mh-ink); }
@@ -663,17 +650,10 @@ body.theme-light {
 /* the prompt: a powerline of pills, then the line you type on */
 .mh-tprompt { padding: 6px 10px 8px; border-top: 1px solid var(--mh-rule); }
 .mh-term-plain .mh-tprompt { padding: 6px 0 0; }
-.mh-pl {
-  --mh-pl-h: 18px;
-  --mh-pl-tip: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
+.mh-pl { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .mh-pl.is-hidden { display: none; }
 .mh-plseg { display: flex; align-items: center; min-width: 0; }
-.mh-pl .mh-seg { font-size: calc(10.5px * var(--mh-scale, 1)); }
+.mh-pl .mh-seg { height: 18px; line-height: 18px; font-size: calc(10.5px * var(--mh-scale, 1)); }
 .mh-ok { background: var(--mh-f3); }
 .mh-err { background: var(--mh-f0); }
 .mh-rp { color: var(--mh-dim); flex: 0 0 auto; }
@@ -693,8 +673,7 @@ body.theme-light {
   background: transparent !important;
   font: inherit;
   color: transparent !important;       /* the coloured copy behind it shows instead */
-  caret-color: var(--mh-fg);
-  caret-shape: bar;
+  caret-color: transparent;            /* the block caret below replaces it */
   user-select: text;
 }
 .mh .mh-input::placeholder { color: var(--mh-dim); opacity: 0.8; }
@@ -713,64 +692,87 @@ body.theme-light {
 .mh-hl-in { display: inline-block; white-space: pre; }
 .mh-ghost { color: var(--mh-dim); opacity: 0.55; white-space: pre; }
 .mh-hl-meas { position: absolute; left: 0; top: 0; visibility: hidden; white-space: pre; }
-.mh .mh-caret { display: none !important; }     /* the input's own thin caret is used */
+.mh-caret {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  display: none;
+  width: 1ch;
+  height: 13px;
+  overflow: hidden;
+  white-space: pre;
+  line-height: 13px;
+  color: var(--mh-ink);
+  background: var(--mh-f0);
+  animation: mh-blink 1.1s steps(1) infinite;
+}
+.mh-inwrap.is-focus .mh-caret { display: block; }
+.mh-inwrap:not(.is-focus) .mh-caret {
+  display: block;
+  color: transparent;
+  background: transparent;
+  outline: 1px solid var(--mh-t0);
+  outline-offset: -1px;
+  animation: none;
+  opacity: 0.55;
+}
+.mh-inwrap.has-sel .mh-caret { display: none !important; }
+.mh-inwrap.is-empty .mh-input { text-indent: 2ch; }
+@keyframes mh-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 .mh-hl-cmd  { color: var(--mh-t3); }
 .mh-hl-bad  { color: var(--mh-t0); }
 .mh-hl-flag { color: var(--mh-t5); }
 .mh-hl-str  { color: var(--mh-t1); }
 
-/* ── the terminal as a tall pane beside the panes ───────────────────────────
-   it sticks to the top of the tab while the panes scroll past, and is never taller than the
-   tab (main.js keeps --mh-vh up to date). */
-.mh-side { min-width: 0; }
-.mh-stick {
-  position: sticky;
-  top: var(--mh-pad, 20px);
-  height: 100%;
-  min-height: 340px;
-  max-height: max(340px, calc(var(--mh-vh, 100vh) - var(--mh-pad, 20px) * 2));
-}
-.mh-stick > .mh-sec { height: 100%; }
-.mh-side .mh-body { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
-.mh-side .mh-term { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
-.mh-side .mh-tbar,
-.mh-side .mh-menu,
-.mh-side .mh-tprompt { flex: 0 0 auto; }
-.mh-side .mh-tout { flex: 1 1 0; min-height: 0; height: auto; }
-/* output stacks up from the prompt, so the welcome line sits right above where you type */
-.mh-side .mh-tout > :first-child { margin-top: auto; }
+/* the six fills as background classes: terminal dots, ls colours, the stats colour bar */
+.mh-bg0 { background: var(--mh-f0); } .mh-bg1 { background: var(--mh-f1); } .mh-bg2 { background: var(--mh-f2); }
+.mh-bg3 { background: var(--mh-f3); } .mh-bg4 { background: var(--mh-f4); } .mh-bg5 { background: var(--mh-f5); }
 
-/* narrow card: the terminal falls back to a short window under the panes */
-@container mhc (max-width: 1040px) {
-  .mh-stick { position: static; height: auto; min-height: 0; max-height: none; }
-  .mh-stick > .mh-sec { height: auto; }
-  .mh-side .mh-body,
-  .mh-side .mh-term { display: block; }
-  .mh-side .mh-tout { height: calc(var(--mh-termlines, 5) * 1.5em + 10px); }
-  .mh-side .mh-tout > :first-child { margin-top: 0; }
+/* a margin does not survive at the end of a column, so full-width sections bring their own gap above them */
+.mh-sec.is-wide { margin-top: var(--mh-gap, 16px); }
+.mh-grid > .mh-sec:first-child { margin-top: 0; }
+.mh-day { line-height: 1.55; }
+
+/* ═══ the terminal dock, the banner's right side, and a prompt that never shows a focus ring ═══ */
+.mh-left { min-width: 0; container-type: inline-size; container-name: mhl; }
+@container mhl (max-width: 1000px) { .mh-cols-3 .mh-grid { column-count: 2; } }
+@container mhl (max-width: 440px)  { .mh-grid { column-count: 1; } }
+
+.mh.has-dock { display: flex; align-items: stretch; gap: calc(var(--mh-gap, 14px) * 1.5); }
+.mh.has-dock > .mh-left { flex: 1 1 0; }
+.mh-dock { flex: 0 0 var(--mh-dock, 36%); min-width: 0; display: flex; }
+.mh-dock .mh-sec { flex: 1 1 auto; display: flex; flex-direction: column; width: 100%; margin: 0 !important; column-span: none; }
+.mh-dock .mh-sec > .mh-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.mh-dock .mh-term { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.mh-dock .mh-tout { flex: 1 1 0; height: auto; min-height: calc(var(--mh-termlines, 6) * 1.5em + 10px); }
+.mh-dock .mh-tprompt { margin-top: auto; }
+/* a narrow card puts the terminal underneath instead */
+@container mhc (max-width: 760px) {
+  .mh.has-dock { flex-direction: column; }
+  .mh-dock { flex: 0 0 auto; width: 100%; }
+  .mh-dock .mh-tout { flex: 0 0 auto; height: calc(var(--mh-termlines, 6) * 1.5em + 10px); min-height: 0; }
 }
 
-/* ═══ settings tab ════════════════════════════════════════════════════════ */
-/* the long text boxes go full width under their label */
-.mh-setting-area { flex-wrap: wrap; }
-.mh-setting-area .setting-item-control { width: 100%; }
-.mh-setting-area textarea { font-family: var(--font-monospace); font-size: 12px; }
+.mh-sec-banner .mh-body.has-side { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.mh-sec-banner .mh-body.has-side .mh-banner:first-child { flex: 0 1 auto; }
+.mh-bside { margin-left: auto; width: min(45%, calc(var(--mh-bw, 20) * var(--mh-banner, 6px) * 0.7)) !important; opacity: 0.9; }
 
-/* groups: each heading folds its settings away */
-.mh-group { border-top: 1px solid var(--background-modifier-border); }
-.mh-group:last-child { border-bottom: 1px solid var(--background-modifier-border); }
-.mh-group-head {
-  display: flex;
-  align-items: center;
-  gap: 0.9ch;
-  padding: 12px 2px;
-  list-style: none;
-  cursor: pointer;
-  font-weight: var(--font-semibold, 600);
-  color: var(--text-normal);
+/* obsidian and themes draw a focus ring on every input. the prompt is not a form field. */
+.mh .mh-line .mh-inwrap > input.mh-input,
+.mh .mh-line .mh-inwrap > input.mh-input:hover,
+.mh .mh-line .mh-inwrap > input.mh-input:focus,
+.mh .mh-line .mh-inwrap > input.mh-input:focus-visible,
+.mh .mh-line .mh-inwrap > input.mh-input:active {
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  -webkit-appearance: none;
+  appearance: none;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
-.mh-group-head::-webkit-details-marker { display: none; }
-.mh-group-head:hover { color: var(--text-accent); }
-.mh-group-chev { display: inline-block; color: var(--text-faint); transition: transform 120ms ease; }
-.mh-group[open] > .mh-group-head .mh-group-chev { transform: rotate(90deg); color: var(--text-accent); }
-.mh-group-body { padding: 0 0 10px; }

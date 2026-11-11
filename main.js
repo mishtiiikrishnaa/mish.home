@@ -5,7 +5,7 @@
    a terminal-style home page for obsidian. one tab you open the app to:
    a starship prompt, big block letters, a greeting, shortcuts, recent notes
    as an eza tree, open todos, a contribution-style streak grid, vault stats
-   btop-style, and a little shell you can type into.
+   in the fastfetch style, and a little shell you can type into.
    dressed like mish.eza and mish.music: same prompt, same rainbow ring,
    same palette variables, same bundled font.
 
@@ -112,7 +112,7 @@ const PROPER = [
   [/\bmacos\b/g, 'macOS'],
   [/\bgithub\b/g, 'GitHub'],
   [/\bmish\b(?!\.[a-z])/g, 'Mish'],      /* the palette, not mish.home / mish.eza */
-  [/\bmish\.(home|music|eza)\b/g, 'mish.$1'],
+  [/\bmish\.(home|music|eza|fastfetch)\b/g, 'mish.$1'],
   [/(?<![\w./-])git\b(?!\/)/g, 'Git'],
 ];
 
@@ -144,6 +144,7 @@ const SECTION_META = {
   banner:    { label: 'banner',      wide: true,  on: true,  desc: 'big block letters: the vault name, your name, the time or any text.' },
   greeting:  { label: 'greeting',    wide: false, on: true,  desc: 'a hello, the date, a one-line summary and progress bars for the day, week, month and year.' },
   shortcuts: { label: 'shortcuts',   wide: false, on: true,  desc: 'commands you can click, with their hotkeys: new note, go to file, anything in the command palette.' },
+  calendar:  { label: 'calendar',    wide: false, on: true,  desc: 'this month, like the cal command. days you wrote on are marked. click a day to open its daily note.' },
   tasks:     { label: 'todo',        wide: false, on: true,  desc: 'open checkboxes from across the vault. click a box to tick it.' },
   recent:    { label: 'recent',      wide: false, on: true,  desc: 'the notes you opened or edited last, as an eza-style tree.' },
   system:    { label: 'system',      wide: false, on: true,  desc: 'cpu, memory, battery and uptime, btop-style. updates live.' },
@@ -159,13 +160,6 @@ const SECTION_META = {
   shell:     { label: 'terminal',    wide: true,  on: true,  desc: 'a terminal window you can type into: open and search notes, add to your inbox, run a timer, and more. type help.' },
 };
 const SECTION_IDS = Object.keys(SECTION_META);
-
-/* which rainbow colour each pane's header pill uses. fixed per section, so a pane keeps its colour
-   wherever you move it. the numbers are indexes into the six palette colours. */
-const PANE_COLOUR = {
-  greeting: 0, tasks: 1, pinned: 2, shortcuts: 3, recent: 4, system: 5,
-  calendar: 2, focus: 0, links: 4, tags: 2, folders: 1, random: 5, git: 3, streak: 3, quote: 1,
-};
 
 const DEFAULT_SHORTCUTS = [
   'new note | file-explorer:new-file',
@@ -224,25 +218,23 @@ const DEFAULT_SETTINGS = {
 
   sections: SECTION_IDS.map((id) => ({ id, on: SECTION_META[id].on, wide: SECTION_META[id].wide })),
 
-  banner: { source: 'vault', custom: '', style: 'blocks', letters: 'lower', size: 6, gradient: 'rainbow', align: 'left' },
+  banner: { source: 'vault', custom: '', style: 'blocks', letters: 'lower', size: 6, gradient: 'rainbow', align: 'left', side: 'clock' },   /* side: clock | date | none (right of the letters) */
 
   greeting: {
     summary: true,
     template: '{greeting}, {name}.',
     showDate: true,
     dateFormat: 'dddd · D MMMM YYYY',
-    progress: { day: true, week: true, month: true, year: true },
-    barWidth: 28,
-    barHeight: 11,
-    barColor: '--mz-f-green',
-    barStyle: 'solid',
+    progress: { day: false, week: false, month: false, year: true },
+    barWidth: 24,
+    barHeight: 9,
   },
 
   shortcuts: { items: DEFAULT_SHORTCUTS, layout: 'list', colour: 'plain', hotkeys: true, hideMissing: true },
 
-  recent: { mode: 'opened', count: 8, types: 'notes', extensions: 'hide', nameColour: 'type', age: true, folder: false, tree: true },
+  recent: { mode: 'opened', count: 8, types: 'notes', extensions: 'hide', nameColour: 'rainbow', age: true, folder: false, tree: true },
 
-  pinned: { paths: '', bookmarks: true, extensions: 'hide', nameColour: 'type', tree: true },
+  pinned: { paths: '', bookmarks: true, extensions: 'hide', nameColour: 'rainbow', tree: true },
 
   tasks: { count: 6, scan: 40, complete: true, showNote: true },
 
@@ -262,12 +254,13 @@ const DEFAULT_SETTINGS = {
     style: 'window',                       /* window | plain */
     titleBar: true,
     title: '{user}@{host}: {path}',
-    height: 4,                             /* lines of scrollback */
+    position: 'right',                     /* right = a tall pane beside the sections | bottom = full width underneath */
+    dockWidth: 36,                         /* percent of the page, in right mode */
+    height: 6,                             /* lines of scrollback (at least this many; in right mode it grows to the height of the page) */
     prompt: 'powerline',                   /* powerline | compact */
     rprompt: true,                         /* the time on the right of the prompt */
     suggest: true,                         /* grey autosuggestions from your history (press → to accept) */
     welcome: true,
-    startup: 'stats, help',                /* commands run once when obsidian opens the pane, so it is never an empty box. comma separated, empty = none */
     placeholder: 'type a command · help',
     capture: 'daily',                      /* daily | inbox: where "add" and "todo add" write */
     inbox: 'inbox.md',
@@ -276,8 +269,8 @@ const DEFAULT_SETTINGS = {
   daily: { folder: '', format: '' },    /* empty = whatever the core daily notes plugin says, else the vault root and YYYY-MM-DD */
 
   /* the card */
-  layout: { frame: 'one', columns: 3, width: 1100, gap: 18, inner: 18, split: 'right', sideWidth: 400, panes: 'boxed', header: 'powerline' },   /* frame: one | each | none. panes: boxed | open. header: powerline | prompt */
-  card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 14, pad: 20, textSize: 100 },
+  layout: { frame: 'one', columns: 3, width: 1100, gap: 14, inner: 14, fit: 'shrink', minScale: 55 },   /* frame: one | each | none. fit: shrink | scroll */
+  card: { hAlign: 'centre', vAlign: 'centre', ring: 'rainbow', ringWidth: 1, angle: 135, radius: 12, pad: 16, textSize: 100 },
 };
 
 /* a data.json from an older version, or one edited by hand, must never break the page */
@@ -316,6 +309,7 @@ const sanitise = (cfg) => {
   b.gradient = oneOf(b.gradient, ['rainbow', 'accent', 'pink', 'plain'], 'rainbow');
   b.align = oneOf(b.align, ['left', 'centre'], 'left');
   b.letters = oneOf(b.letters, ['lower', 'caps'], 'lower');
+  b.side = oneOf(b.side, ['clock', 'date', 'none'], 'clock');
   b.size = num(b.size, 3, 14, 6);
 
   const g = cfg.greeting;
@@ -371,9 +365,10 @@ const sanitise = (cfg) => {
   tm.style = oneOf(tm.style, ['window', 'plain'], 'window');
   tm.prompt = oneOf(tm.prompt, ['powerline', 'compact'], 'powerline');
   tm.capture = oneOf(tm.capture, ['daily', 'inbox'], 'daily');
-  tm.height = num(tm.height, 2, 20, 4);
+  tm.height = num(tm.height, 2, 30, 6);
+  tm.position = oneOf(tm.position, ['right', 'bottom'], 'right');
+  tm.dockWidth = num(tm.dockWidth, 22, 55, 36);
   if (typeof tm.inbox !== 'string' || !tm.inbox.trim()) tm.inbox = 'inbox.md';
-  if (typeof tm.startup !== 'string') tm.startup = 'stats, help';
 
   const l = cfg.layout;
   l.frame = oneOf(l.frame, ['one', 'each', 'none'], 'one');
@@ -381,14 +376,8 @@ const sanitise = (cfg) => {
   l.width = num(l.width, 420, 1400, 1100);
   l.gap = num(l.gap, 0, 40, 14);
   l.inner = num(l.inner, 0, 40, 14);
-  /* 2.0: the page scrolls instead of shrinking, so the old fit settings are gone */
-  delete l.fit;
-  delete l.minScale;
-  delete l.scaleV2;
-  l.panes = oneOf(l.panes, ['boxed', 'open'], 'boxed');
-  l.header = oneOf(l.header, ['powerline', 'prompt'], 'powerline');
-  l.split = oneOf(l.split, ['right', 'off'], 'right');      /* right = the terminal is a tall pane beside the sections */
-  l.sideWidth = num(l.sideWidth, 260, 640, 400);
+  l.fit = oneOf(l.fit, ['shrink', 'scroll'], 'shrink');
+  l.minScale = num(l.minScale, 30, 100, 55);
 
   const c = cfg.card;
   c.ring = oneOf(c.ring, RINGS, 'rainbow');
@@ -427,17 +416,11 @@ const paletteVars = (cfg) => {
 
 /* css variables for sizes, the border and the layout. every one has the default as its
    fallback in styles.css. */
-/* the terminal sits in its own tall pane when that is switched on and the terminal section is too */
-const splitActive = (cfg) => cfg.layout.split === 'right' && cfg.sections.some((it) => it.id === 'shell' && it.on);
-/* the pane is added on top of the width you set, so the sections keep the room they always had */
-const cardWidth = (cfg) => cfg.layout.width + (splitActive(cfg) ? cfg.layout.sideWidth : 0);
-
 const layoutVars = (cfg) => {
   const c = cfg.card;
   const l = cfg.layout;
   const v = {
-    '--mh-w': cardWidth(cfg) + 'px',
-    '--mh-side': l.sideWidth + 'px',
+    '--mh-w': l.width + 'px',
     '--mh-cols': String(l.columns),
     '--mh-gap': l.gap + 'px',
     '--mh-inner': l.inner + 'px',
@@ -839,7 +822,7 @@ class MishHome extends Plugin {
     const saved = (await this.loadData()) || {};
     this.settings = sanitise(deepMerge(clone(DEFAULT_SETTINGS), saved.settings || {}));
     uiCase.lower = this.settings.lowercaseUi;
-    /* older versions saved an older section list; the new default (system, terminal) applies once */
+    /* older versions saved an older section list; the new default (calendar, system, terminal, no fastfetch) applies once */
     if ((saved.v || 0) < 3) {
       const d = DEFAULT_SETTINGS;
       this.settings.sections = clone(d.sections);
@@ -848,21 +831,7 @@ class MishHome extends Plugin {
       this.settings.streak.cell = d.streak.cell;
       this.settings.streak.gap = d.streak.gap;
     }
-    /* 1.3: a calmer page. the spacing moved once, and only where it was still the old default,
-       so anyone who had already tuned it keeps their numbers. */
-    if ((saved.v || 0) < 4) {
-      const l = this.settings.layout;
-      const c = this.settings.card;
-      if (l.gap === 14) l.gap = 18;
-      if (l.inner === 14) l.inner = 18;
-      if (c.radius === 12) c.radius = 14;
-      if (c.pad === 16) c.pad = 20;
-      /* the help dump filled the terminal pane with a wall of text on every launch */
-      if (this.settings.terminal.startup === 'stats, help') this.settings.terminal.startup = 'stats';
-      /* a rainbow per row in the file lists was the busiest part of the page */
-      if (this.settings.recent.nameColour === 'rainbow') this.settings.recent.nameColour = 'type';
-      if (this.settings.pinned.nameColour === 'rainbow') this.settings.pinned.nameColour = 'type';
-    }
+    if ((saved.v || 0) < 4) this.settings.terminal.height = DEFAULT_SETTINGS.terminal.height;      /* the terminal got taller */
     this.opened = Array.isArray(saved.opened) ? saved.opened.filter((p) => typeof p === 'string').slice(0, 60) : [];
     this.history = Array.isArray(saved.history) ? saved.history.filter((p) => typeof p === 'string').slice(-60) : [];
     this.activity = {};
@@ -1546,7 +1515,7 @@ class MishHome extends Plugin {
 
   async saveAll() {
     await this.saveData({
-      v: 5,
+      v: 4,
       settings: this.settings,
       focusLog: this.focusLog,
       opened: this.opened,
@@ -1628,18 +1597,85 @@ class HomeView extends ItemView {
 
   stop() {
     if (this.streakRO) { this.streakRO.disconnect(); this.streakRO = null; }
-    if (this.vhRO) { this.vhRO.disconnect(); this.vhRO = null; }
+    if (this.fitRO) { this.fitRO.disconnect(); this.fitRO = null; }
+    if (this.fitRaf) { cancelAnimationFrame(this.fitRaf); this.fitRaf = 0; }
   }
 
-  /* ── layout ────────────────────────────────────────────────────────────────
-     the page is an ordinary scrolling surface: a grid of panes that reflows with the width of the
-     card (see styles.css), and scrolls when there is more of it than tab. the one thing measured
-     here is how tall the tab is, so the terminal pane can stay on screen while the panes scroll by. */
-  syncViewport() {
-    const sc = this.scrollEl;
-    if (!sc || !this.contentEl.isShown()) return;
-    const h = sc.clientHeight;
-    if (h > 0) this.contentEl.style.setProperty('--mh-vh', h + 'px');
+  /* ── fitting the page to the tab ───────────────────────────────────────────
+     the home page should never need scrolling. the card is laid out at the width it will end up
+     with, measured, and when it is too tall it is scaled down (and laid out wider by the same
+     factor, so it still fills the same width and needs fewer lines). if even the smallest allowed
+     scale is not enough, scrolling comes back, because unreachable content is worse. */
+  scheduleFit() {
+    if (this.fitRaf) return;
+    this.fitRaf = requestAnimationFrame(() => {
+      this.fitRaf = 0;
+      if (this.contentEl.isShown()) this.fit();
+    });
+  }
+
+  fit() {
+    const scroll = this.scrollEl;
+    const card = this.cardEl;
+    if (!scroll || !card) return;
+    const L = this.s.layout;
+    card.style.width = '';
+    card.style.margin = '';
+    card.style.transform = '';
+    card.style.transformOrigin = '';
+    scroll.classList.remove('is-overflow');
+    this.contentEl.classList.toggle('mh-fit', L.fit === 'shrink');
+    if (L.fit !== 'shrink') return;
+
+    const cs = (scroll.ownerDocument.defaultView || window).getComputedStyle(scroll);
+    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const availW = scroll.clientWidth - padX;
+    const availH = scroll.clientHeight - padY;
+    if (!(availW > 80 && availH > 80)) return;       /* not laid out yet */
+
+    const baseW = Math.min(availW, L.width);
+    const floor = L.minScale / 100;
+    /* the card is laid out at baseW / k and then scaled by k, so it always ends up baseW wide.
+       a smaller k means a wider layout, which means fewer wrapped lines and maybe more columns,
+       so the visible height (layout height * k) only ever shrinks as k shrinks. bisect for the
+       largest k that fits. */
+    const visible = (k) => {
+      card.style.width = (baseW / k) + 'px';
+      return card.offsetHeight * k;
+    };
+    /* "does it fit" is not smooth: widening the layout can flip it to a dock or add a column, which
+       drops the height in a step. so scan down in small steps, then refine inside the last step. */
+    const fits = (k) => visible(k) <= availH;
+    let k = 1;
+    if (!fits(1)) {
+      let found = null;
+      for (let kk = 0.98; kk >= floor - 1e-9; kk -= 0.02) {
+        if (fits(kk)) { found = kk; break; }
+      }
+      if (found === null) {
+        k = floor;
+      } else {
+        let lo = found;
+        let hi = Math.min(1, found + 0.02);
+        for (let i = 0; i < 5; i++) {
+          const mid = (lo + hi) / 2;
+          if (fits(mid)) lo = mid; else hi = mid;
+        }
+        k = lo;
+      }
+    }
+    card.style.width = (baseW / k) + 'px';
+    const h = card.offsetHeight;
+
+    const c = this.s.card;
+    const offX = c.hAlign === 'left' ? 0 : Math.max(0, (availW - baseW) / 2);
+    const offY = c.vAlign === 'top' ? 0 : Math.max(0, (availH - h * k) / 2);
+    card.style.transformOrigin = '0 0';
+    card.style.transform = k < 1 ? 'scale(' + k + ')' : '';
+    /* the negative bottom margin cancels the room the unscaled box would take */
+    card.style.margin = offY + 'px 0 ' + (h * k - h) + 'px ' + offX + 'px';
+    if (h * k > availH + 1) scroll.classList.add('is-overflow');
   }
 
   focusShell() {
@@ -1664,41 +1700,37 @@ class HomeView extends ItemView {
 
     const scroll = el('div', 'mh-scroll');
     const card = el('div', 'mh');
+    const left = el('div', 'mh-left');
     this.bar = el('div', 'mh-bar');
-    card.appendChild(this.bar);
+    left.appendChild(this.bar);
 
-    /* the sections are panes in one grid. with the terminal split off, it is a tall pane beside
-       the grid (tmux style) and stays on screen while the rest scrolls. */
-    const active = s.sections.filter((it) => it.on);
-    const split = splitActive(s);
+    /* the terminal can live in a tall pane on the right (a dock) instead of in the flow */
     const grid = el('div', 'mh-grid');
-    let side = null;
+    const active = s.sections.filter((it) => it.on);
+    let dock = null;
     for (const it of active) {
       const sec = this.makeSection(it);
-      if (split && it.id === 'shell') side = sec; else grid.appendChild(sec);
+      if (it.id === 'shell' && s.terminal.position === 'right') dock = sec;
+      else grid.appendChild(sec);
     }
     if (!active.length) grid.appendChild(el('div', 'mh-hint is-wide', '# every section is switched off. open settings > mish.home.'));
-
-    const layout = el('div', 'mh-layout');
-    const main = el('div', 'mh-main');
-    main.appendChild(grid);
-    layout.appendChild(main);
-    if (side) {
-      const pane = el('div', 'mh-side');
-      const stick = el('div', 'mh-stick');
-      stick.appendChild(side);
-      pane.appendChild(stick);
-      layout.appendChild(pane);
+    left.appendChild(grid);
+    card.appendChild(left);
+    if (dock) {
+      const pane = el('div', 'mh-dock');
+      pane.appendChild(dock);
+      card.appendChild(pane);
     }
-    card.appendChild(layout);
+    card.classList.toggle('has-dock', Boolean(dock));
     scroll.appendChild(card);
     host.appendChild(scroll);
     this.scrollEl = scroll;
     this.cardEl = card;
     if (typeof ResizeObserver === 'function') {
-      this.vhRO = new ResizeObserver(() => this.syncViewport());
-      this.vhRO.observe(scroll);
+      this.fitRO = new ResizeObserver(() => this.scheduleFit());
+      this.fitRO.observe(scroll);
     }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.scheduleFit());
 
     this.restyle();
     this.drawBar();
@@ -1712,44 +1744,29 @@ class HomeView extends ItemView {
     const font = fontStack(s);
     if (font) vars['--vf-mono'] = font;
     vars['--mh-termlines'] = String(s.terminal.height);
+    vars['--mh-dock'] = s.terminal.dockWidth + '%';
     applyVars(host, vars);
     setClassGroup(host, 'mh-shape-', s.pillShape);
     setClassGroup(host, 'mh-frame-', s.layout.frame);
     setClassGroup(host, 'mh-cols-', String(s.layout.columns));
-    setClassGroup(host, 'mh-panes-', s.layout.panes);
-    setClassGroup(host, 'mh-head-', s.layout.header);
-    host.classList.toggle('mh-split-on', splitActive(s));
     host.classList.toggle('mh-lower', s.lowercaseText);
+    host.classList.toggle('mh-nocmd', !s.showCommands);
     if (this.leaf && this.leaf.updateHeader) this.leaf.updateHeader();     /* picks up a new tab title */
-    this.syncViewport();
+    this.scheduleFit();
   }
 
-  /* a pane: a header, then the body the section fills. the header is a little powerline of its own:
-     the section's name in its colour, then the command it pretends to have run, dimmed. */
   makeSection(it) {
     const sec = el('div', 'mh-sec mh-sec-' + it.id + (it.wide ? ' is-wide' : ''));
     sec.dataset.id = it.id;
     const refs = { sec };
     const cmd = this.s.showCommands ? this.cmdFor(it.id) : null;
-    if (cmd && this.s.layout.header === 'prompt') {
+    if (cmd) {
       const line = el('div', 'mh-cmd');
-      line.appendChild(el('span', 'mh-chev', '\u276F'));
+      line.appendChild(el('span', 'mh-chev', '❯'));
       line.appendChild(el('span', 'mh-exe', cmd[0]));
       refs.arg = el('span', 'mh-arg', cmd[1]);
       line.appendChild(refs.arg);
       sec.appendChild(line);
-    } else if (cmd) {
-      const meta = SECTION_META[it.id];
-      const colour = (PANE_COLOUR[it.id] != null ? PANE_COLOUR[it.id] : SECTION_IDS.indexOf(it.id)) % COLOURS;
-      const head = el('div', 'mh-ph');
-      head.appendChild(this.pill('mh-ph-a mh-bg' + colour, '\u276F ' + (meta ? meta.label : it.id), 0));
-      /* the second pill is the command. when the command is just the section's name, only its flags are shown */
-      const run = this.pill('mh-ph-b', '', 1);
-      if (!meta || cmd[0] !== meta.label) run.appendChild(el('span', 'mh-exe', cmd[0]));
-      refs.arg = el('span', 'mh-arg', cmd[1]);
-      if (cmd[1]) run.appendChild(refs.arg);
-      if (run.childNodes.length) head.appendChild(run);
-      sec.appendChild(head);
     }
     refs.body = el('div', 'mh-body');
     sec.appendChild(refs.body);
@@ -1771,7 +1788,7 @@ class HomeView extends ItemView {
       case 'random': return ['cat', ''];
       case 'git': return ['git', 'log --oneline -n' + s.git.count];
       case 'shortcuts': return ['launch', ''];
-      case 'fetch': return ['top', '-n1'];
+      case 'fetch': return ['fastfetch', ''];
       case 'recent': {
         const sort = { opened: 'accessed', edited: 'modified', created: 'created' }[s.recent.mode];
         return ['eza', '--tree --sort=' + sort + ' -r -n' + s.recent.count];
@@ -1790,7 +1807,8 @@ class HomeView extends ItemView {
     if (!r || !fn) return;
     try {
       const out = fn.call(this, r.body);
-      if (out && out.then) out.then(null, (e) => this.broke(id, e));
+      if (out && out.then) out.then(() => this.scheduleFit(), (e) => this.broke(id, e));
+      else this.scheduleFit();
     } catch (e) {
       this.broke(id, e);
     }
@@ -1819,13 +1837,15 @@ class HomeView extends ItemView {
     if (this.refs.focus) this.updateFocus();
     if (this.refs.system && now - (this.sysAt || 0) >= 2000) {
       this.sysAt = now;
+      const before = this.sysRows;
       try { this.fill_system(this.refs.system.body); } catch (e) { this.broke('system', e); }
+      if (before !== this.sysRows) this.scheduleFit();      /* the battery row can show up late */
     }
     const minute = Math.floor(now / 60000);
     if (minute !== this.minute) {
       this.minute = minute;
       for (const id of ['greeting', 'calendar']) if (this.refs[id]) this.fill(id);
-      if (this.refs.banner && this.s.banner.source === 'time') this.fill('banner');
+      if (this.refs.banner && (this.s.banner.source === 'time' || this.s.banner.side === 'clock')) this.fill('banner');
       this.updatePrompt();
     }
   }
@@ -1833,15 +1853,6 @@ class HomeView extends ItemView {
   userName() { return this.s.username || this.plugin.detected.user; }
 
   hint(text, cls) { return el('div', 'mh-hint' + (cls ? ' ' + cls : ''), '# ' + text); }
-
-  /* one segment of a powerline. `i` is its place in the row: each segment paints above the one
-     after it, so its arrow tip lies over the next segment's flat edge (see .mh-seg in styles.css).
-     without that order the tips are hidden and the row turns into plain stripes. */
-  pill(cls, text, i) {
-    const n = el('span', 'mh-seg ' + cls, text);
-    n.style.setProperty('--i', String(i));
-    return n;
-  }
 
   /* ── the powerline prompt ──────────────────────────────────────────────── */
 
@@ -1860,8 +1871,7 @@ class HomeView extends ItemView {
     const p = s.pills;
     bar.replaceChildren();
     this.clockEl = null;
-    let at = 0;
-    const seg = (cls, text) => { const n = this.pill(cls, text, at++); bar.appendChild(n); return n; };
+    const seg = (cls, text) => { const n = el('span', 'mh-seg ' + cls, text); bar.appendChild(n); return n; };
 
     if (p.user) seg('mh-user', osGlyph() + ' ' + this.userName());
     if (p.path) seg('mh-path', s.pathLabel || '~/' + this.app.vault.getName());
@@ -1878,24 +1888,43 @@ class HomeView extends ItemView {
 
   /* ── banner ────────────────────────────────────────────────────────────── */
 
+  /* the small block letters on the right of the banner */
+  bannerSideText() {
+    const side = this.s.banner.side;
+    if (side === 'clock') {
+      const d = new Date();
+      const h = this.s.clock.hour12 ? d.getHours() % 12 || 12 : d.getHours();
+      return pad(h) + ':' + pad(d.getMinutes());
+    }
+    if (side === 'date') return moment().format('ddd D MMM').toLowerCase();
+    return '';
+  }
+
   fill_banner(body) {
     const b = this.s.banner;
     body.replaceChildren();
-    body.classList.toggle('is-centre', b.align === 'centre');
     let text = this.app.vault.getName();
     if (b.source === 'name') text = this.userName();
     else if (b.source === 'time') {
       const d = new Date();
       const h = this.s.clock.hour12 ? d.getHours() % 12 || 12 : d.getHours();
       text = pad(h) + ':' + pad(d.getMinutes());
-    }
-    else if (b.source === 'custom' && b.custom.trim()) text = b.custom.trim();
+    } else if (b.source === 'custom' && b.custom.trim()) text = b.custom.trim();
     if (b.style === 'text') {
+      body.classList.remove('has-side');
+      body.classList.toggle('is-centre', b.align === 'centre');
       body.appendChild(el('div', 'mh-btext mh-grad-' + b.gradient, text));
       return;
     }
+    const sideText = b.side !== 'none' ? this.bannerSideText() : '';
+    body.classList.toggle('has-side', Boolean(sideText));
+    body.classList.toggle('is-centre', b.align === 'centre' && !sideText);
     const svg = bannerSvg(text, this.uid, b.gradient, b.letters);
     if (svg) body.appendChild(svg);
+    if (sideText) {
+      const side = bannerSvg(sideText, this.uid + 's', b.gradient, b.letters);
+      if (side) { side.classList.add('mh-bside'); body.appendChild(side); }
+    }
   }
 
   /* ── greeting ──────────────────────────────────────────────────────────── */
@@ -1984,7 +2013,7 @@ class HomeView extends ItemView {
     items.forEach((it, i) => {
       const known = Boolean(this.app.commands.commands[it.id]);
       const row = el('div', 'mh-sc' + (known ? '' : ' is-missing'));
-      row.appendChild(el('span', 'mh-chev' + (sc.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), '❯'));
+      row.appendChild(el('span', 'mh-chev mh-c' + (i % COLOURS), '❯'));
       row.appendChild(el('span', 'mh-sclabel' + (sc.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), it.label));
       if (sc.hotkeys && known) {
         const hk = this.plugin.hotkeyFor(it.id);
@@ -2407,7 +2436,7 @@ class HomeView extends ItemView {
     body.classList.toggle('is-row', l.layout === 'row');
     items.forEach((it, i) => {
       const row = el('div', 'mh-sc');
-      row.appendChild(el('span', 'mh-chev' + (l.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), '❯'));
+      row.appendChild(el('span', 'mh-chev mh-c' + (i % COLOURS), '❯'));
       row.appendChild(el('span', 'mh-sclabel' + (l.colour === 'rainbow' ? ' mh-c' + (i % COLOURS) : ''), it.label));
       let host = '';
       try { host = new URL(/^[a-z]+:\/\//i.test(it.id) ? it.id : 'https://' + it.id).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
@@ -2636,10 +2665,9 @@ class HomeView extends ItemView {
     if (sh.title) setText(sh.title, this.termTitle());
     if (t.prompt !== 'powerline') return;
     const group = el('span', 'mh-plseg');
-    let at = 0;
-    group.appendChild(this.pill('mh-path', this.cwdLabel(), at++));
-    if (this.s.pills.git && this.plugin.branch) group.appendChild(this.pill('mh-git', this.plugin.branch, at++));
-    group.appendChild(this.pill(ok ? 'mh-ok' : 'mh-err', ok ? '✓' : '✘', at++));
+    group.appendChild(el('span', 'mh-seg mh-path', this.cwdLabel()));
+    if (this.s.pills.git && this.plugin.branch) group.appendChild(el('span', 'mh-seg mh-git', this.plugin.branch));
+    group.appendChild(el('span', 'mh-seg ' + (ok ? 'mh-ok' : 'mh-err'), ok ? '✓' : '✘'));
     sh.pl.appendChild(group);
     if (t.rprompt) {
       const d = new Date();
@@ -2809,26 +2837,6 @@ class HomeView extends ItemView {
 
     this.renderScrollback();
     this.updatePrompt();
-    this.runStartup();
-  }
-
-  /* the tall pane would be a black box with one line in it, so the first time it opens in a session it
-     runs a few commands, like a login message. they are not added to your history, and clear empties them. */
-  runStartup() {
-    const p = this.plugin;
-    if (!splitActive(this.s) || p.startupDone || p.scrollback.length) return;
-    const list = String(this.s.terminal.startup || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 6);
-    if (!list.length) return;
-    /* wait for the page to be laid out: in a narrow tab the terminal is a short window under the sections, and a
-       login message would just scroll past in it */
-    window.setTimeout(async () => {
-      const sh = this.refs.shell;
-      if (p.startupDone || p.scrollback.length || !sh || !sh.out || sh.out.clientHeight < 140) return;
-      p.startupDone = true;
-      for (const c of list) {
-        try { await this.exec(c, true); } catch (e) { console.error('mish.home: startup command failed', e); }
-      }
-    }, 250);
   }
 
   /* ── completion ────────────────────────────────────────────────────────── */
@@ -2943,14 +2951,12 @@ class HomeView extends ItemView {
 
   /* ── running things ────────────────────────────────────────────────────── */
 
-  async exec(line, quiet) {
+  async exec(line) {
     const raw = line.trim();
     if (!raw) return;
     const p = this.plugin;
-    if (!quiet) {
-      if (p.history[p.history.length - 1] !== raw) p.history.push(raw);
-      p.persist();
-    }
+    if (p.history[p.history.length - 1] !== raw) p.history.push(raw);
+    p.persist();
 
     const tokens = tokenise(raw);
     const name = tokens[0].toLowerCase();
@@ -3297,7 +3303,7 @@ class HomeView extends ItemView {
     });
 
     /* ── info ── */
-    def(['stats', 'neofetch'], 'stats', 'a summary of the vault', 'info', () => {
+    def(['stats', 'fastfetch', 'neofetch'], 'stats', 'a summary of the vault', 'info', () => {
       const st = plugin.vaultStats();
       let path = this.app.vault.getName();
       try { path = this.app.vault.adapter.getBasePath() || path; } catch (e) { /* not a desktop adapter */ }
@@ -3434,14 +3440,9 @@ class HomeSettingTab extends PluginSettingTab {
   }
 
   display() {
-    const { plugin } = this;
-    const root = this.containerEl;
+    const { containerEl, plugin } = this;
     const s = plugin.settings;
-    root.empty();
-    /* settings are added to `containerEl`; head() points it at the group it just opened, so every
-       setting that follows lands inside that group. the open groups are remembered across redraws. */
-    let containerEl = root;
-    if (!this.open) this.open = new Set(['sections']);
+    containerEl.empty();
 
     /* "a.b.c" paths into the settings and into the defaults */
     const at = (path) => {
@@ -3534,15 +3535,7 @@ class HomeSettingTab extends PluginSettingTab {
           }));
     };
 
-    const head = (name) => {
-      const box = root.createEl('details', { cls: 'mh-group' });
-      box.open = this.open.has(name);
-      box.addEventListener('toggle', () => { if (box.open) this.open.add(name); else this.open.delete(name); });
-      const sum = box.createEl('summary', { cls: 'mh-group-head' });
-      sum.createSpan({ cls: 'mh-group-chev', text: '\u276F' });
-      sum.createSpan({ text: ui(name) });
-      containerEl = box.createDiv({ cls: 'mh-group-body' });
-    };
+    const head = (name) => new UiSetting(containerEl).setName(name).setHeading();
 
     /* ── the first setting: how the text in this tab is cased ── */
     new UiSetting(containerEl)
@@ -3608,17 +3601,17 @@ class HomeSettingTab extends PluginSettingTab {
         .addToggle((t) => t.setValue(it.on).onChange((v) => { it.on = v; apply('build'); this.redraw(); }))
         .addExtraButton((b) => b
           .setIcon(it.wide ? 'rectangle-horizontal' : 'square')
-          .setTooltip(ui(it.wide ? 'spans the whole row' : 'one column wide'))
+          .setTooltip(ui(it.wide ? 'full width in the two-column layout' : 'half width in the two-column layout'))
           .onClick(() => {
             it.wide = !it.wide;
             b.setIcon(it.wide ? 'rectangle-horizontal' : 'square');
-            b.setTooltip(ui(it.wide ? 'spans the whole row' : 'one column wide'));
+            b.setTooltip(ui(it.wide ? 'full width in the two-column layout' : 'half width in the two-column layout'));
             apply('build');
           }))
         .addExtraButton((b) => b.setIcon('arrow-up').setTooltip(ui('move up')).onClick(() => move(i, -1)))
         .addExtraButton((b) => b.setIcon('arrow-down').setTooltip(ui('move down')).onClick(() => move(i, 1)));
     });
-    tog('showCommands', 'pane headers', 'the header above each section: its name, and the command it pretends to have run.', 'build');
+    tog('showCommands', 'command lines', 'the ❯ line above each section, like the command that drew it.', 'build');
 
     /* ── prompt ── */
     head('prompt');
@@ -3641,11 +3634,11 @@ class HomeSettingTab extends PluginSettingTab {
     slide('banner.size', 'block size', 'how big one pixel of a letter is. a ten-letter name is about 60 pixels wide.', 3, 14, 1, 'look', ' px');
     drop('banner.gradient', 'colour', 'rainbow runs across the six palette colours.',
       { rainbow: 'rainbow', accent: 'accent colour', pink: 'first palette colour', plain: 'plain text colour' }, 'data');
-    drop('banner.align', 'position', '', { left: 'left', centre: 'centre' }, 'data');
-
-    }
+    drop('banner.side', 'on the right', 'a smaller block of letters at the right end of the banner, so that side is not empty.', { clock: 'the time', date: 'the date', none: 'nothing' }, 'data');
+    drop('banner.align', 'position', 'only used when nothing is on the right.', { left: 'left', centre: 'centre' }, 'data');
 
     /* ── greeting ── */
+    }
 
     if (on('greeting')) {
     head('greeting');
@@ -3659,9 +3652,9 @@ class HomeSettingTab extends PluginSettingTab {
     tog('greeting.progress.year', 'year progress bar', '', 'data');
     slide('greeting.barWidth', 'bar length', 'number of cells in each bar.', 8, 40, 1, 'data', '');
     slide('greeting.barHeight', 'bar thickness', '', 4, 14, 1, 'look', ' px');
-    }
 
     /* ── shortcuts ── */
+    }
 
     if (on('shortcuts')) {
     head('shortcuts');
@@ -3681,6 +3674,8 @@ class HomeSettingTab extends PluginSettingTab {
     drop('shortcuts.colour', 'label colour', '', { plain: 'plain', rainbow: 'rainbow' }, 'data');
     tog('shortcuts.hideMissing', 'hide unavailable', 'leaves out shortcuts whose command does not exist (for example, a core plugin you have switched off), instead of showing them dimmed.', 'data');
     tog('shortcuts.hotkeys', 'show hotkeys', 'the little ⌘ n badge, when the command has a hotkey.', 'data');
+
+    /* ── fastfetch ── */
     }
 
     if (on('calendar')) {
@@ -3704,9 +3699,8 @@ class HomeSettingTab extends PluginSettingTab {
     tog('recent.folder', 'show folder', 'the folder, after the name.', 'data');
     tog('recent.tree', 'tree lines', 'the ├── └── lines. off uses a ❯ in front of each name.', 'data');
 
-    }
-
     /* ── pinned ── */
+    }
 
     if (on('pinned')) {
     head('pinned');
@@ -3716,9 +3710,8 @@ class HomeSettingTab extends PluginSettingTab {
     drop('pinned.nameColour', 'name colours', '', { rainbow: 'rainbow', type: 'by file type', plain: 'plain' }, 'data');
     tog('pinned.tree', 'tree lines', '', 'data');
 
-    }
-
     /* ── todo ── */
+    }
 
     if (on('tasks')) {
     head('todo');
@@ -3727,9 +3720,8 @@ class HomeSettingTab extends PluginSettingTab {
     tog('tasks.complete', 'click a box to tick it', 'ticks the box in the note itself. nothing is written unless the line is still exactly what the page shows.', 'data');
     tog('tasks.showNote', 'show the note name', '', 'data');
 
-    }
-
     /* ── streak ── */
+    }
 
     if (on('focus')) {
     head('focus timer');
@@ -3801,21 +3793,21 @@ class HomeSettingTab extends PluginSettingTab {
     drop('quote.mode', 'pick', 'daily shows the same line all day. random picks a new one each time the page opens.', { daily: 'one per day', random: 'random' }, 'data');
     area('quote.lines', 'lines', 'one per line.', 6, 'data');
 
-    }
-
     /* ── shell ── */
+    }
 
     if (on('shell')) {
     head('terminal');
     drop('terminal.style', 'look', 'window is a terminal window with a title bar and its own background. plain is just the text.', { window: 'window', plain: 'plain' }, 'build');
     tog('terminal.titleBar', 'title bar', 'the three dots and the title above the window. the first dot clears it.', 'build');
     text('terminal.title', 'title', 'you can use {user}, {host}, {path} and {vault}.', '{user}@{host}: {path}', 'build');
-    slide('terminal.height', 'scrollback height', 'lines of output shown above the prompt.', 2, 20, 1, 'look', '');
+    drop('terminal.position', 'where it lives', 'right is a tall pane beside the other sections, like a tmux pane, and it grows to the height of the page. bottom is a full-width window underneath. narrow tabs always use bottom.', { right: 'on the right', bottom: 'at the bottom' }, 'build');
+    slide('terminal.dockWidth', 'width on the right', 'how much of the page the pane takes, in percent.', 22, 55, 1, 'look', '%');
+    slide('terminal.height', 'scrollback height', 'lines of output shown above the prompt. on the right it is a minimum, and the pane grows to fit the page.', 2, 30, 1, 'look', '');
     drop('terminal.prompt', 'prompt', 'powerline adds a line of pills above the prompt: the folder you are in, the git branch, and whether the last command worked.',
       { powerline: 'powerline', compact: 'compact' }, 'build');
     tog('terminal.rprompt', 'time on the right', 'the time at the right end of the powerline.', 'build');
     tog('terminal.suggest', 'autosuggestions', 'grey suggestions from your history as you type. press → to take one.', 'look');
-    text('terminal.startup', 'startup commands', 'run once when the terminal pane first opens, so it has something in it. separate with commas. leave empty for none. only used when the terminal is a pane.', 'stats, help', 'build');
     tog('terminal.welcome', 'welcome line', 'the one-line hint before you have typed anything.', 'build');
     text('terminal.placeholder', 'placeholder', 'what the empty prompt says.', 'type a command · help', 'build');
     drop('terminal.capture', 'add writes to', 'the add and todo add commands put a line in today\'s daily note, or in one inbox note.', { daily: "today's daily note", inbox: 'an inbox note' }, 'look');
@@ -3916,15 +3908,11 @@ class HomeSettingTab extends PluginSettingTab {
     head('card and layout');
     drop('layout.frame', 'frame', 'one card puts everything in a single bordered box. each section gives every section its own box. none has no borders at all.',
       { one: 'one card', each: 'each section', none: 'none' }, 'look');
-    drop('layout.columns', 'columns', 'how many panes sit side by side. fewer are used automatically when the tab gets narrow.', { 1: 'one', 2: 'two', 3: 'three' }, 'look');
-    drop('layout.panes', 'panes', 'boxed gives every section a thin outline, like tmux panes. open leaves them borderless.',
-      { boxed: 'boxed', open: 'open' }, 'look');
-    drop('layout.header', 'pane header style', 'powerline draws the header as pills with arrow tips, like the prompt. prompt is the plain ❯ command line.',
-      { powerline: 'powerline pills', prompt: 'plain command line' }, 'build');
-    drop('layout.split', 'terminal', 'right puts the terminal in a tall pane beside the sections, like a tmux split. off keeps it as a short row under them.',
-      { right: 'tall pane on the right', off: 'row at the bottom' }, 'build');
-    slide('layout.sideWidth', 'terminal pane width', 'only used when the terminal is a pane. the pane is added to the maximum width below, so the sections keep their room. it stays on screen while the page scrolls.', 260, 640, 10, 'look', ' px');
-    slide('layout.width', 'maximum width', 'how wide the page gets in a big tab. when the tab is smaller, the page narrows and the panes reflow.', 420, 1400, 20, 'look', ' px');
+    drop('layout.columns', 'columns', 'sections flow down each column, balanced, so there are no gaps. full-width sections span them all. narrow tabs use fewer columns.', { 1: 'one', 2: 'two', 3: 'three' }, 'look');
+    drop('layout.fit', 'when the page is taller than the tab', 'shrink scales the whole page down to fit, so it never scrolls. scroll leaves it full size and lets you scroll.',
+      { shrink: 'shrink to fit', scroll: 'scroll' }, 'look');
+    slide('layout.minScale', 'smallest size', 'shrinking stops here. if the page still does not fit, scrolling comes back so nothing is out of reach. turn a section off or lower the number of rows to get more room.', 30, 100, 5, 'look', '%');
+    slide('layout.width', 'maximum width', 'how wide the page gets in a big tab.', 420, 1400, 20, 'look', ' px');
     slide('layout.gap', 'gap between sections', '', 0, 40, 1, 'look', ' px');
     slide('layout.inner', 'card padding', 'space between a border and what is inside it.', 0, 40, 1, 'look', ' px');
     drop('card.ring', 'border', "rainbow uses the palette. accent is obsidian's accent colour. subtle is your theme's border colour.",
