@@ -50,7 +50,7 @@
       {
         "id": "greeting",
         "on": true,
-        "wide": false
+        "wide": true
       },
       {
         "id": "shortcuts",
@@ -60,17 +60,17 @@
       {
         "id": "tasks",
         "on": true,
-        "wide": false
+        "wide": true
       },
       {
         "id": "recent",
         "on": true,
-        "wide": false
+        "wide": true
       },
       {
         "id": "system",
         "on": true,
-        "wide": false
+        "wide": true
       },
       {
         "id": "pinned",
@@ -109,12 +109,12 @@
       },
       {
         "id": "streak",
-        "on": true,
+        "on": false,
         "wide": true
       },
       {
         "id": "quote",
-        "on": false,
+        "on": true,
         "wide": false
       },
       {
@@ -144,7 +144,9 @@
         "year": true
       },
       "barWidth": 24,
-      "barHeight": 9
+      "barHeight": 9,
+      "barColor": "--mz-f-green",
+      "barStyle": "solid"
     },
     "shortcuts": {
       "items": "new note | file-explorer:new-file\ngo to file | switcher:open\ndaily note | mish-home:daily-note\nsearch | global-search:open\ngraph view | graph:open\ncommand palette | command-palette:open",
